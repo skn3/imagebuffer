@@ -9,9 +9,7 @@ Add:
 
 ```monkey
 Method GetSurface:Surface()
-
 	Return surface
-	
 End
 ```
 
