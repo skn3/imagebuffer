@@ -3,7 +3,10 @@ imagebuffer
 
 Monkey ImageBuffer Module
 
-This module requires one modification to monkey. Add: 
+This module requires one modification to monkey.
+
+Add: 
+
 ```monkey
 Method GetSurface:Surface()
 
