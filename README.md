@@ -4,10 +4,12 @@ imagebuffer
 Monkey ImageBuffer Module
 
 This module requires one modification to monkey. Add: 
-```Method GetSurface:Surface()
+```monkey
+Method GetSurface:Surface()
 
 	Return surface
 	
-End```
+End
+```
 
 to the _Class Image_ in _modules/mojo/graphics.monkey_
