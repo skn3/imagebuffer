@@ -130,6 +130,9 @@ void FBONative::_Dettach() {
 	// --- dettach texture from fbo ---
 	if (attached) {
 		attached = false;
+		texture = 0;
+		width = 0;
+		height = 0;
 		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,0, 0);
 	}
 }
@@ -199,6 +202,7 @@ void FBONative::_Finish() {
 	if (bound == true) {
 		//need to flush out any stored rendering
 		if (graphicsStarted == true) {
+			graphicsStarted = false;
 			bb_graphics_renderDevice->Flush();
 			
 			//need to revert the render buffer

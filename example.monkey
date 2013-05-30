@@ -2,6 +2,11 @@ Import mojo
 Import opengl
 Import skn3.imagebuffer
 
+'version 2
+' - fixed some flags not being reset
+'version 1
+' - first commit
+
 Function Main:Int()
 	New MyApp
 End
