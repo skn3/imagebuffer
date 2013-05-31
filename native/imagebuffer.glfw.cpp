@@ -204,8 +204,11 @@ bool FBONative::_Start() {
 		
 		//check if mojo is current rendering
 		if (bb_graphics_renderDevice == 0) {
-			//we are rendering to the fbo outside of the OnRender()
+			//we are rendering to the fbo outside of OnRender()
 			onRenderActive = false;
+			
+			//trick monkey into thinking it is rendering
+			gc_assign(bb_graphics_renderDevice,bb_graphics_device);
 		} else {
 			//mojo is rendering
 			//when we finish the fbo we will need to reset the mojo rendering
@@ -214,9 +217,6 @@ bool FBONative::_Start() {
 			//make monkey flush itself
 			bb_graphics_renderDevice->Flush();
 		}
-		
-		//trick monkey into thinking it is rendering
-		gc_assign(bb_graphics_renderDevice,bb_graphics_device);
 		
 		//bind the fbo
 		glBindFramebuffer(GL_FRAMEBUFFER,fbo);
