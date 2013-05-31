@@ -1,5 +1,7 @@
 Strict
 
+'version 4
+' - started to add some shader support
 'version 3
 ' - added device capability checks
 ' - removed some wasted method calls from extended FBO
