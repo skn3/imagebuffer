@@ -4,7 +4,11 @@ extern gxtkGraphics* bb_graphics_device;
 extern int bb_graphics_BeginRender();
 extern int bb_graphics_SetScissor(Float t_x,Float t_y,Float t_width,Float t_height);
 
+
+
 // --- gl stuff ---
+typedef char GLchar;
+
 void(__stdcall*glGenFramebuffers)(GLsizei n, GLuint* framebuffers);
 void(__stdcall*glBindFramebuffer)(GLenum target, GLuint framebuffer);
 void(__stdcall*glFramebufferTexture)(GLenum target, GLenum attachment, GLuint texture, GLint level);
@@ -15,6 +19,20 @@ void(__stdcall*glRenderbufferStorage)(GLenum target, GLenum internalformat, GLsi
 void(__stdcall*glFramebufferRenderbuffer)(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
 void(__stdcall*glBindRenderbuffer)(GLenum target, GLuint renderbuffer);
 void(__stdcall*glDeleteRenderbuffers)(GLsizei n, const GLuint* renderbuffers);
+GLuint(__stdcall*glCreateShader)(GLenum type);
+void(__stdcall*glShaderSource)(GLuint shader, GLsizei count, const GLchar** string, const GLint* length);
+void(__stdcall*glCompileShader)(GLuint shader);
+void(__stdcall*glGetProgramiv)(GLuint program, GLenum pname, GLint* params);
+void(__stdcall*glGetShaderiv)(GLuint shader, GLenum pname, GLint* params);
+void(__stdcall*glGetShaderInfoLog)(GLuint shader, GLsizei bufsize, GLsizei* length, GLchar* infolog);
+GLuint(__stdcall*glCreateProgram)(void);
+void(__stdcall*glAttachShader)(GLuint program, GLuint shader);
+void(__stdcall*glDetachShader)(GLuint program, GLuint shader);
+void(__stdcall*glLinkProgram)(GLuint program);
+void(__stdcall*glUseProgram)(GLuint program);
+void(__stdcall*glGetShaderSource)(GLuint shader, GLsizei bufsize, GLsizei* length, GLchar* source);
+
+
 
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_RENDERBUFFER 0x8D41
@@ -22,36 +40,156 @@ void(__stdcall*glDeleteRenderbuffers)(GLsizei n, const GLuint* renderbuffers);
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
 #define GL_DEPTH_COMPONENT16 0x81A5
+#define GL_FRAGMENT_SHADER 0x8B30
+#define GL_VERTEX_SHADER 0x8B31
+#define GL_COMPILE_STATUS 0x8B81
+#define GL_INFO_LOG_LENGTH 0x8B84
+#define GL_ATTACHED_SHADERS 0x8B85
+#define GL_SHADER_SOURCE_LENGTH 0x8B88
+
+
+
+// --- globals / constants ---
+#define GRAPHICS_CAPABILITY_IMAGE_BUFFERS 1
+#define GRAPHICS_CAPABILITY_SHADERS 2
+
+static bool capabilitySupportedImageBuffers = false;
+static bool capabilitySupportedShaders = false;
+
+static bool capabilityLoadedImageBuffers = false;
+static bool capabilityLoadedShaders = false;
+
+
 
 // --- functions ---
-static bool CheckGraphicsAbility(int ability) {
+static int CheckGraphicsCapability(int capability) {
 	// --- return if the device supports certain abilities ---
-	switch(ability) {
-		case 1://GRAPHICS_CAPABILITY_IMAGE_BUFFER
+	switch(capability) {
+		case GRAPHICS_CAPABILITY_IMAGE_BUFFERS:
 			return glfwExtensionSupported("GL_ARB_framebuffer_object");
 			break;
 			
-		case 2://GRAPHICS_CAPABILITY_SHADERS
-			return true;
+		case GRAPHICS_CAPABILITY_SHADERS:
+			return glfwExtensionSupported("GL_ARB_shading_language_100") && glfwExtensionSupported("GL_ARB_vertex_shader") && glfwExtensionSupported("GL_ARB_fragment_shader");
 			break;
 	}
 	
 	//default no
-	return false;
+	return 0;
 }
 
-// --- Shader ---
-class Shader : public Object {
+static void LoadGraphicsCapability(int capability) {
+	// --- this will load a capability ---
+	//these will only ever be loaded once, obviously.
 	
+	//do speciffic loading
+	switch(capability) {
+		case GRAPHICS_CAPABILITY_IMAGE_BUFFERS:
+			if (capabilityLoadedImageBuffers == false) {
+				capabilityLoadedImageBuffers = true;
+				
+				if (CheckGraphicsCapability(GRAPHICS_CAPABILITY_IMAGE_BUFFERS)) {
+					//supported
+					capabilitySupportedImageBuffers = true;
+					
+					//load extensions
+					(void*&)glGenFramebuffers=(void*)glfwGetProcAddress("glGenFramebuffers");
+					(void*&)glBindFramebuffer=(void*)glfwGetProcAddress("glBindFramebuffer");
+					(void*&)glFramebufferTexture=(void*)wglGetProcAddress("glFramebufferTexture");
+					(void*&)glCheckFramebufferStatus=(void*)wglGetProcAddress("glCheckFramebufferStatus");
+					(void*&)glDeleteFramebuffers=(void*)wglGetProcAddress("glDeleteFramebuffers");
+					(void*&)glGenRenderbuffers=(void*)wglGetProcAddress("glGenRenderbuffers");
+					(void*&)glRenderbufferStorage=(void*)wglGetProcAddress("glRenderbufferStorage");
+					(void*&)glFramebufferRenderbuffer=(void*)wglGetProcAddress("glFramebufferRenderbuffer");
+					(void*&)glBindRenderbuffer=(void*)wglGetProcAddress("glBindRenderbuffer");
+					(void*&)glDeleteRenderbuffers=(void*)wglGetProcAddress("glDeleteRenderbuffers");
+		
+				} else {
+					//not supported
+					capabilitySupportedImageBuffers = false;
+				}
+			}
+			break;
+			
+		case GRAPHICS_CAPABILITY_SHADERS:
+			if (capabilityLoadedShaders == false) {
+				capabilityLoadedShaders = true;
+				
+				if (CheckGraphicsCapability(GRAPHICS_CAPABILITY_SHADERS)) {
+					//supported
+					capabilitySupportedShaders = true;
+					
+					//load extensions
+					(void*&)glCreateShader=(void*)wglGetProcAddress("glCreateShader");
+					(void*&)glShaderSource=(void*)wglGetProcAddress("glShaderSource");
+					(void*&)glCompileShader=(void*)wglGetProcAddress("glCompileShader");
+					(void*&)glGetProgramiv=(void*)wglGetProcAddress("glGetProgramiv");
+					(void*&)glGetShaderiv=(void*)wglGetProcAddress("glGetShaderiv");
+					(void*&)glGetShaderInfoLog=(void*)wglGetProcAddress("glGetShaderInfoLog");
+					(void*&)glCreateProgram=(void*)wglGetProcAddress("glCreateProgram");
+					(void*&)glAttachShader=(void*)wglGetProcAddress("glAttachShader");
+					(void*&)glDetachShader=(void*)wglGetProcAddress("glDetachShader");
+					(void*&)glLinkProgram=(void*)wglGetProcAddress("glLinkProgram");
+					(void*&)glUseProgram=(void*)wglGetProcAddress("glUseProgram");
+					(void*&)glGetShaderSource=(void*)wglGetProcAddress("glGetShaderSource");
+					
+				} else {
+					//not supported
+					capabilitySupportedShaders = false;
+				}
+			}
+			break;
+	}
+	
+	//do shared loading (required for gl functions used by multiple capabilities)
+	//none yet
+}
+
+
+
+// --- Shader header ---
+class ShaderNative : public Object {
+	public:
+	ShaderNative();
+	
+	GLuint shader;
+	String compileError;
+	bool valid;
+	
+	bool _Init(int type);
+	bool _SetSource(String source);
+	String _GetError();
+	bool _IsValid();
+	bool _HasSource();
 };
+
+
+
+// --- ShaderProgram header ---
+class ShaderProgramNative : public Object {
+	public:
+	ShaderProgramNative();
+	
+	static bool startLocked;
+	
+	GLuint program;
+	bool used;
+	
+	bool _Init();
+	bool _Attach(ShaderNative *shader);
+	bool _Detach(ShaderNative *shader);
+	bool _Link();
+	bool _Start();
+	bool _Finish();
+};
+
+
 
 // --- FBO header ---
 class FBONative : public Object {
 	public:
 	FBONative();
 	
-	static bool loaded;
-	static bool supported;
 	static bool startLocked;
 	static bool onRenderActive;
 	
@@ -68,18 +206,272 @@ class FBONative : public Object {
 	bool _Init();
 	bool _Free();
 	bool _Attach(gxtkSurface *surface);
-	bool _Dettach();
+	bool _Detach();
 	bool _Start();
 	bool _Finish();
 	bool _Clear(float r,float g, float b,float a);
 };
 
+
+
+// --- Shader class ---
+//constructor/destructor
+ShaderNative::ShaderNative() {
+	shader = 0;
+	compileError = String();
+	valid = false;
+}
+
+bool ShaderNative::_Init(int type) {
+	// --- init the shader ---
+	//make sure capabilities are loaded
+	LoadGraphicsCapability(GRAPHICS_CAPABILITY_SHADERS);
+	
+	//are we supported?
+	if (capabilitySupportedShaders) {
+		//convert monkey shader type
+		GLenum shaderType;
+		switch(type) {
+			case 1://VERTEX_SHADER
+				shaderType = GL_VERTEX_SHADER;
+				break;
+			case 2://FRAGMENT_SHADER
+				shaderType = GL_FRAGMENT_SHADER;
+				break;
+			default:
+				//fail
+				return false;
+				break;
+		}
+		
+		//create the shader
+		shader = glCreateShader(shaderType);
+		if (shader == 0) { return false; }
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+bool ShaderNative::_SetSource(String source) {
+	// --- set the shaders source ---
+	valid = false;
+	
+	if (capabilitySupportedShaders) {
+		//convert monkey string into char
+		const GLchar *theSource = source.ToCString<GLchar>();
+		
+		//set the shaders source
+		glShaderSource(shader,1,&theSource,NULL);
+		
+		//compile the source
+		glCompileShader(shader);
+		
+		//free the source
+		delete theSource;
+		
+		//check if the shader compiled
+		GLint compiled;
+		glGetProgramiv(shader, GL_COMPILE_STATUS, &compiled);
+		if (compiled == 0) {
+			//failed
+			//get the compile error
+			GLint blen = 0;	
+			GLsizei slen = 0;
+
+			glGetShaderiv(shader, GL_INFO_LOG_LENGTH , &blen);       
+			if (blen > 1) {
+				//has error
+ 				GLchar* compilerLog = (GLchar*)malloc(blen);
+ 				glGetShaderInfoLog(shader, blen, &slen, compilerLog);
+				compileError = String(compilerLog);
+ 				delete compilerLog;
+			} else {
+				//no error
+				compileError = String();
+			}
+			
+			//fail
+			return false;
+		}
+		
+		//success
+		valid = true;
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+String ShaderNative::_GetError() {
+	// --- return the last compile error ---
+	return compileError;
+}
+
+bool ShaderNative::_IsValid() {
+	// --- return true if the shader is valid ---
+	return capabilitySupportedShaders && valid;
+}
+
+bool ShaderNative::_HasSource() {
+	// --- return true if the shader has source ---
+	if (capabilitySupportedShaders && valid) {
+		GLint size = 0;
+		glGetShaderiv(shader,GL_SHADER_SOURCE_LENGTH,&size);
+		
+		//take into account null terminated string (should probably fix this?)
+		return size<=1?false:true;
+	}
+	
+	//fail
+	return false;
+}
+
+
+
+// --- ShaderProgram class ---
+bool ShaderProgramNative::startLocked = false;
+
+//constructor/destructor
+ShaderProgramNative::ShaderProgramNative() {
+	used = false;
+}
+
+bool ShaderProgramNative::_Init() {
+	// --- init the shaderprogram ---
+	//make sure capabilities are loaded
+	LoadGraphicsCapability(GRAPHICS_CAPABILITY_SHADERS);
+	
+	//are we supported?
+	if (capabilitySupportedShaders) {
+		//create the program
+		program = glCreateProgram();
+		if (program == 0) {
+			//fail
+			return false;
+		}
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+bool ShaderProgramNative::_Attach(ShaderNative *shader) {
+	// --- attach a ahder to the program ---
+	//are we supported?
+	if (capabilitySupportedShaders) {
+		//attach
+		glAttachShader(program,shader->shader);
+		
+		//check for error
+		if (glGetError() != GL_NO_ERROR) { return false; }
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+bool ShaderProgramNative::_Detach(ShaderNative *shader) {
+	// --- detach a ahder from the program ---
+	//are we supported?
+	if (capabilitySupportedShaders) {
+		//attach
+		glDetachShader(program,shader->shader);
+		
+		//check for error
+		if (glGetError() != GL_NO_ERROR) { return false; }
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+bool ShaderProgramNative::_Link() {
+	// --- link shaders into program ---
+	//are we supported?
+	if (capabilitySupportedShaders) {
+		//attach
+		glLinkProgram(program);
+		
+		//check for error
+		if (glGetError() != GL_NO_ERROR) { return false; }
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;	
+}
+
+bool ShaderProgramNative::_Start() {
+	// --- use program ---
+	//are we supported?
+	if (capabilitySupportedShaders && startLocked == false && used == false) {
+		//make monkey flush itself
+		bb_graphics_renderDevice->Flush();
+		
+		//use program
+		glUseProgram(program);
+		
+		//check for error
+		if (glGetError() != GL_NO_ERROR) { return false; }
+		
+		//flag using
+		used = true;
+		startLocked = true;
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;	
+}
+
+bool ShaderProgramNative::_Finish() {
+	// --- stop using this program ---
+	if (used) {
+		//make monkey flush itself
+		bb_graphics_renderDevice->Flush();
+		
+		//unuse program
+		glUseProgram(0);
+	
+		used = false;
+		startLocked = false;
+			
+		//check for error
+		if (glGetError() != GL_NO_ERROR) { return false; }
+			
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+
+
 // --- FBO class ---
-bool FBONative::loaded = false;
-bool FBONative::supported = false;
 bool FBONative::startLocked = false;
 bool FBONative::onRenderActive = false;
 
+//constructor/destructor
 FBONative::FBONative() {
 	bound = false;
 	attached = false;
@@ -87,37 +479,11 @@ FBONative::FBONative() {
 
 bool FBONative::_Init() {
 	// --- create the fbo ---
-	//do we need to load ?
-	if (loaded != true) {
-		loaded = true;
-		
-		//glGenFramebuffers
-		//GL_EXT_framebuffer_object
-		//GL_ARB_framebuffer_object
-		if (glfwExtensionSupported("GL_ARB_framebuffer_object")) {
-			//supported
-			supported = true;
-			
-			//load extensions
-			(void*&)glGenFramebuffers=(void*)glfwGetProcAddress("glGenFramebuffers");
-			(void*&)glBindFramebuffer=(void*)glfwGetProcAddress("glBindFramebuffer");
-			(void*&)glFramebufferTexture=(void*)wglGetProcAddress("glFramebufferTexture");
-			(void*&)glCheckFramebufferStatus=(void*)wglGetProcAddress("glCheckFramebufferStatus");
-			(void*&)glDeleteFramebuffers=(void*)wglGetProcAddress("glDeleteFramebuffers");
-			(void*&)glGenRenderbuffers=(void*)wglGetProcAddress("glGenRenderbuffers");
-			(void*&)glRenderbufferStorage=(void*)wglGetProcAddress("glRenderbufferStorage");
-			(void*&)glFramebufferRenderbuffer=(void*)wglGetProcAddress("glFramebufferRenderbuffer");
-			(void*&)glBindRenderbuffer=(void*)wglGetProcAddress("glBindRenderbuffer");
-			(void*&)glDeleteRenderbuffers=(void*)wglGetProcAddress("glDeleteRenderbuffers");
-
-		} else {
-			//not supported
-			supported = false;
-		}
-	}
+	//make sure capabilities are loaded
+	LoadGraphicsCapability(GRAPHICS_CAPABILITY_IMAGE_BUFFERS);
 	
 	//are we supported?
-	if (supported) {
+	if (capabilitySupportedImageBuffers) {
 		//create fbo
 		glGenFramebuffers(1,&fbo);
 		
@@ -129,10 +495,11 @@ bool FBONative::_Init() {
 	return false;
 }
 
+//api
 bool FBONative::_Free() {
 	// --- free teh fbo ---
-	if (supported) {
-		_Dettach();
+	if (capabilitySupportedImageBuffers) {
+		_Detach();
 		_Finish();
 		
 		//delete teh fbo
@@ -150,7 +517,7 @@ bool FBONative::_Free() {
 bool FBONative::_Attach(gxtkSurface *surface) {
 	// --- attach texture to the fbo ---
 	//we do this separately so we can reuse the depth buffer in later binds
-	if (supported && bound == false) {
+	if (capabilitySupportedImageBuffers && bound == false) {
 		//generate a depth buffer
 		glGenRenderbuffers(1, &depthBuffer);
 		glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
@@ -170,7 +537,7 @@ bool FBONative::_Attach(gxtkSurface *surface) {
 	return false;
 }
 
-bool FBONative::_Dettach() {
+bool FBONative::_Detach() {
 	// --- dettach texture from fbo ---
 	if (attached) {
 		//dettach
@@ -199,7 +566,7 @@ bool FBONative::_Dettach() {
 
 bool FBONative::_Start() {
 	// --- bind the fbo ---
-	if (startLocked == false && supported && attached && bound == false) {
+	if (startLocked == false && capabilitySupportedImageBuffers && attached && bound == false) {
 		bound = true;
 		
 		//check if mojo is current rendering
@@ -304,7 +671,7 @@ bool FBONative::_Finish() {
 		}
 	
 		//dettach first
-		//_Dettach();
+		//_Detach();
 		
 		//now unbind the fbo
 		glBindFramebuffer(GL_FRAMEBUFFER,0);
