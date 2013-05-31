@@ -14,6 +14,7 @@ void(__stdcall*glGenRenderbuffers)(GLsizei n, GLuint* renderbuffers);
 void(__stdcall*glRenderbufferStorage)(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
 void(__stdcall*glFramebufferRenderbuffer)(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
 void(__stdcall*glBindRenderbuffer)(GLenum target, GLuint renderbuffer);
+void(__stdcall*glDeleteRenderbuffers)(GLsizei n, const GLuint* renderbuffers);
 
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_RENDERBUFFER 0x8D41
@@ -22,6 +23,28 @@ void(__stdcall*glBindRenderbuffer)(GLenum target, GLuint renderbuffer);
 #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
 #define GL_DEPTH_COMPONENT16 0x81A5
 
+// --- functions ---
+static bool CheckGraphicsAbility(int ability) {
+	// --- return if the device supports certain abilities ---
+	switch(ability) {
+		case 1://GRAPHICS_CAPABILITY_IMAGE_BUFFER
+			return glfwExtensionSupported("GL_ARB_framebuffer_object");
+			break;
+			
+		case 2://GRAPHICS_CAPABILITY_SHADERS
+			return true;
+			break;
+	}
+	
+	//default no
+	return false;
+}
+
+// --- Shader ---
+class Shader : public Object {
+	
+};
+
 // --- FBO header ---
 class FBONative : public Object {
 	public:
@@ -29,6 +52,8 @@ class FBONative : public Object {
 	
 	static bool loaded;
 	static bool supported;
+	static bool startLocked;
+	static bool onRenderActive;
 	
 	GLuint fbo;
 	GLuint depthBuffer;
@@ -36,31 +61,31 @@ class FBONative : public Object {
 	int width;
 	int height;
 	bool bound;
-	bool graphicsStarted;
 	bool attached;
 	int deviceWidth;
 	int deviceHeight;
 	
-	void _Init();
-	void _Free();
-	void _Attach(gxtkSurface *surface);
-	void _Dettach();
-	void _Start();
-	void _Finish();
-	void _Clear(float r,float g, float b,float a);
+	bool _Init();
+	bool _Free();
+	bool _Attach(gxtkSurface *surface);
+	bool _Dettach();
+	bool _Start();
+	bool _Finish();
+	bool _Clear(float r,float g, float b,float a);
 };
 
 // --- FBO class ---
 bool FBONative::loaded = false;
 bool FBONative::supported = false;
+bool FBONative::startLocked = false;
+bool FBONative::onRenderActive = false;
 
 FBONative::FBONative() {
 	bound = false;
 	attached = false;
-	graphicsStarted = false;
 }
 
-void FBONative::_Init() {
+bool FBONative::_Init() {
 	// --- create the fbo ---
 	//do we need to load ?
 	if (loaded != true) {
@@ -83,6 +108,7 @@ void FBONative::_Init() {
 			(void*&)glRenderbufferStorage=(void*)wglGetProcAddress("glRenderbufferStorage");
 			(void*&)glFramebufferRenderbuffer=(void*)wglGetProcAddress("glFramebufferRenderbuffer");
 			(void*&)glBindRenderbuffer=(void*)wglGetProcAddress("glBindRenderbuffer");
+			(void*&)glDeleteRenderbuffers=(void*)wglGetProcAddress("glDeleteRenderbuffers");
 
 		} else {
 			//not supported
@@ -94,22 +120,34 @@ void FBONative::_Init() {
 	if (supported) {
 		//create fbo
 		glGenFramebuffers(1,&fbo);
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
 
-void FBONative::_Free() {
+bool FBONative::_Free() {
 	// --- free teh fbo ---
 	if (supported) {
-		//first unbind (and dettach)
+		_Dettach();
 		_Finish();
 		
-		//now delete teh fbo
+		//delete teh fbo
 		glDeleteFramebuffers(1,&fbo);
 		fbo = 0;
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
 
-void FBONative::_Attach(gxtkSurface *surface) {
+bool FBONative::_Attach(gxtkSurface *surface) {
 	// --- attach texture to the fbo ---
 	//we do this separately so we can reuse the depth buffer in later binds
 	if (supported && bound == false) {
@@ -123,24 +161,59 @@ void FBONative::_Attach(gxtkSurface *surface) {
 		texture = surface->texture;
 		width = surface->width;
 		height = surface->height;
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
 
-void FBONative::_Dettach() {
+bool FBONative::_Dettach() {
 	// --- dettach texture from fbo ---
 	if (attached) {
+		//dettach
 		attached = false;
+		
+		//reset values
 		texture = 0;
 		width = 0;
 		height = 0;
+		
+		//dettach texture and depth buffer
 		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,0, 0);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER, 0);
+		
+		//destroy the depth buffer
+		glDeleteRenderbuffers(1,&depthBuffer);
+		depthBuffer = 0;
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
 
-void FBONative::_Start() {
+bool FBONative::_Start() {
 	// --- bind the fbo ---
-	if (supported && attached && bound == false) {
+	if (startLocked == false && supported && attached && bound == false) {
 		bound = true;
+		
+		//check if mojo is current rendering
+		if (bb_graphics_renderDevice == 0) {
+			//we are rendering to the fbo outside of the OnRender()
+			onRenderActive = false;
+		} else {
+			//mojo is rendering
+			//when we finish the fbo we will need to reset the mojo rendering
+			onRenderActive = true;
+			
+			//make monkey flush itself
+			bb_graphics_renderDevice->Flush();
+		}
 		
 		//trick monkey into thinking it is rendering
 		gc_assign(bb_graphics_renderDevice,bb_graphics_device);
@@ -157,7 +230,7 @@ void FBONative::_Start() {
 		//check for success
 		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 			_Finish();
-			return;
+			return false;
 		}
 		
 		//setup viewport
@@ -166,6 +239,7 @@ void FBONative::_Start() {
 		//setup matrix for image
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
+		glScalef (1.0f, -1.0f, 1.0f); // switch y axis so it matches screen rendering
 		glOrtho(0,width,height,0,-1,1);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
@@ -193,41 +267,68 @@ void FBONative::_Start() {
 		bb_graphics_BeginRender();
 		
 		//flag graphics started
-		graphicsStarted = true;
+		startLocked = true;
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
 
-void FBONative::_Finish() {
+bool FBONative::_Finish() {
 	// --- bind the fbo ---
 	if (bound == true) {
-		//need to flush out any stored rendering
-		if (graphicsStarted == true) {
-			graphicsStarted = false;
+		bound = false;
+		
+		//check to see if we are rendering to fbo
+		if (startLocked == true) {
+			startLocked = false;
+			
+			//need to output changes to the fbo
 			bb_graphics_renderDevice->Flush();
 			
-			//need to revert the render buffer
-			bb_graphics_renderDevice=0;
-		
 			//restore device size
 			bb_graphics_device->width = deviceWidth;
 			bb_graphics_device->height = deviceHeight;
+			
+			//check if we were previously in onrender
+			if (onRenderActive) {
+				//reset monkey render state
+				bb_graphics_renderDevice->BeginRender();
+			} else {
+				//not rendering anymore so stop fooling monkey
+				bb_graphics_renderDevice=0;
+			}
 		}
 	
 		//dettach first
-		_Dettach();
+		//_Dettach();
 		
-		//now unbind
-		bound = false;
+		//now unbind the fbo
 		glBindFramebuffer(GL_FRAMEBUFFER,0);
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
 
-void FBONative::_Clear(float r,float g, float b,float a) {
+bool FBONative::_Clear(float r,float g, float b,float a = 255.0) {
 	// --- this is a helper for completely clearing the image (alpha and all) ---
 	if (bound == true) {
 		bb_graphics_renderDevice->primCount=0;
 
 		glClearColor( r/255.0f,g/255.0f,b/255.0f,a/255.0f );
 		glClear( GL_COLOR_BUFFER_BIT );
+		
+		//success
+		return true;
 	}
+	
+	//fail
+	return false;
 }
