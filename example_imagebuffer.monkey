@@ -24,7 +24,7 @@ Class MyApp Extends App
 		SetUpdateRate(60)
 		
 		'do basic fbo check
-		If CheckGraphicsCapability(GRAPHICS_CAPABILITY_IMAGE_BUFFER) = False Error("Not supported sorry!")
+		If CheckGraphicsCapability(GRAPHICS_CAPABILITY_IMAGE_BUFFERS) = False Error("Not supported sorry!")
 		
 		'create monkey image (this will generate teh underlying texture)
 		image = CreateImage(DeviceWidth(), DeviceHeight(), 1, Image.MidHandle)

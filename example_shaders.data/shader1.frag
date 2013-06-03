@@ -1,3 +1,5 @@
+uniform testing123 999;
+
 #define M_PI 3.14159265358979323846
 const mat2 rotation = mat2( cos(M_PI/4.0), sin(M_PI/4.0),-sin(M_PI/4.0), cos(M_PI/4.0));
 	

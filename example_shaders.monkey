@@ -33,7 +33,7 @@ Class MyApp Extends App
 		shaderProgram = New ShaderProgram()
 		shaderVert = New Shader(VERTEX_SHADER)
 		shaderFragment = New Shader(FRAGMENT_SHADER)
-		
+				
 		'setup first shader source
 		NextShader()
 		
@@ -86,40 +86,73 @@ Class MyApp Extends App
 		'load vert shader
 		If fileVert.Length = 0
 			'no vert shader
-			Print "No vert shader"
 		Else
 			'has vert shader
 			If shaderVert.SetSource(LoadString(fileVert)) = False
-				Print "Shader '" + fileVert + "' Failed: " + shaderVert.GetError()
+				Print "Set Shader '" + fileVert + "' Source: Failed - " + shaderVert.GetError()
 			Else
-				Print "Shader '" + fileVert + "' Loaded :D"
+				Print "Set Shader '" + fileVert + "' Source: Success!"
 			EndIf
 		EndIf
 		
 		'load frag shader
 		If fileFrag.Length = 0
 			'no frag shader
-			Print "No frag shader"
 		Else
 			'has frag shader
 			If shaderFragment.SetSource(LoadString(fileFrag)) = False
-				Print "Shader '" + fileFrag + "' Failed: " + shaderFragment.GetError()
+				Print "Set Shader '" + fileFrag + "' Source: Failed: " + shaderFragment.GetError()
 			Else
-				Print "Shader '" + fileFrag + "' Loaded :D"
+				Print "Set Shader '" + fileFrag + "' Source: Success!"
 			EndIf
 		EndIf
 		
 		'attach shaders to program
 		If shaderVert.HasSource()
-			shaderProgram.Attach(shaderVert)
-			Print "attaching vertex shader"
+			If shaderProgram.Attach(shaderVert) = False
+				Print "Attach Shader '" + fileVert + "': Failed"
+			Else
+				Print "Attach Shader '" + fileVert + "': Success!"
+			EndIf
 		EndIf
+		
 		If shaderFragment.HasSource()
-			shaderProgram.Attach(shaderFragment)
-			Print "attaching fragment shader"
+			If shaderProgram.Attach(shaderFragment) = False
+				Print "Attach Shader '" + fileFrag + "': Failed"
+			Else
+				Print "Attach Shader '" + fileFrag + "': Success!"
+			EndIf
 		EndIf
 		
 		'link the program
-		shaderProgram.Link()
+		If shaderProgram.Link() = False
+			Print "Link Shader Program: Failed"
+		Else
+			Print "Link Shader Program: Success!"
+		EndIf
+		
+		'test setting a uniform value
+		If shaderProgram.Start() = False
+			Print "Start Shader Program: Failed"
+		Else
+			Print "Start Shader Program: Success!"
+			
+			Local id:= "testing123"
+			Local value:= 123
+			Local location:= shaderProgram.GetUniformLocation(id)
+			If location = -1 Print "cant find uniform '" + id + "'"
+			
+			If shaderProgram.SetUniform(location, value) = False
+				Print "Set Shader Program Uniform '" + id + "' to '" + value + "': Failed"
+			Else
+				Print "Set Shader Program Uniform '" + id + "' to '" + value + "': Success!"
+			EndIf
+			
+			If shaderProgram.Finish() = False
+				Print "Finish Shader Program: Failed"
+			Else
+				Print "Finish Shader Program: Success!"
+			EndIf
+		EndIf
 	End
 End

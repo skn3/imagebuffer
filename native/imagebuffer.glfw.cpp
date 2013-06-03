@@ -2,7 +2,6 @@
 extern gxtkGraphics* bb_graphics_renderDevice;
 extern gxtkGraphics* bb_graphics_device;
 extern int bb_graphics_BeginRender();
-extern int bb_graphics_SetScissor(Float t_x,Float t_y,Float t_width,Float t_height);
 
 
 
@@ -31,6 +30,29 @@ void(__stdcall*glDetachShader)(GLuint program, GLuint shader);
 void(__stdcall*glLinkProgram)(GLuint program);
 void(__stdcall*glUseProgram)(GLuint program);
 void(__stdcall*glGetShaderSource)(GLuint shader, GLsizei bufsize, GLsizei* length, GLchar* source);
+int(__stdcall*glGetUniformLocation)(GLuint program, const GLchar* name);
+void(__stdcall*glGetUniformfv)(GLuint program, GLint location, GLfloat* params);
+void(__stdcall*glGetUniformiv)(GLuint program, GLint location, GLint* params);
+void(__stdcall*glUniform1f)(GLint location, GLfloat x);
+void(__stdcall*glUniform1fv)(GLint location, GLsizei count, const GLfloat* v);
+void(__stdcall*glUniform1i)(GLint location, GLint x);
+void(__stdcall*glUniform1iv)(GLint location, GLsizei count, const GLint* v);
+void(__stdcall*glUniform2f)(GLint location, GLfloat x, GLfloat y);
+void(__stdcall*glUniform2fv)(GLint location, GLsizei count, const GLfloat* v);
+void(__stdcall*glUniform2i)(GLint location, GLint x, GLint y);
+void(__stdcall*glUniform2iv)(GLint location, GLsizei count, const GLint* v);
+void(__stdcall*glUniform3f)(GLint location, GLfloat x, GLfloat y, GLfloat z);
+void(__stdcall*glUniform3fv)(GLint location, GLsizei count, const GLfloat* v);
+void(__stdcall*glUniform3i)(GLint location, GLint x, GLint y, GLint z);
+void(__stdcall*glUniform3iv)(GLint location, GLsizei count, const GLint* v);
+void(__stdcall*glUniform4f)(GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
+void(__stdcall*glUniform4fv)(GLint location, GLsizei count, const GLfloat* v);
+void(__stdcall*glUniform4i)(GLint location, GLint x, GLint y, GLint z, GLint w);
+void(__stdcall*glUniform4iv)(GLint location, GLsizei count, const GLint* v);
+void(__stdcall*glUniformMatrix2fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix3fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix4fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+int(__stdcall*glGetAttribLocation)(GLuint program, const GLchar* name);
 
 
 
@@ -132,6 +154,29 @@ static void LoadGraphicsCapability(int capability) {
 					(void*&)glLinkProgram=(void*)wglGetProcAddress("glLinkProgram");
 					(void*&)glUseProgram=(void*)wglGetProcAddress("glUseProgram");
 					(void*&)glGetShaderSource=(void*)wglGetProcAddress("glGetShaderSource");
+					(void*&)glGetUniformfv=(void*)wglGetProcAddress("glGetUniformfv");
+					(void*&)glGetUniformiv=(void*)wglGetProcAddress("glGetUniformiv");
+					(void*&)glGetUniformLocation=(void*)wglGetProcAddress("glGetUniformLocation");
+					(void*&)glUniform1f=(void*)wglGetProcAddress("glUniform1f");
+					(void*&)glUniform1fv=(void*)wglGetProcAddress("glUniform1fv");
+					(void*&)glUniform1i=(void*)wglGetProcAddress("glUniform1i");
+					(void*&)glUniform1iv=(void*)wglGetProcAddress("glUniform1iv");
+					(void*&)glUniform2f=(void*)wglGetProcAddress("glUniform2f");
+					(void*&)glUniform2fv=(void*)wglGetProcAddress("glUniform2fv");
+					(void*&)glUniform2i=(void*)wglGetProcAddress("glUniform2i");
+					(void*&)glUniform2iv=(void*)wglGetProcAddress("glUniform2iv");
+					(void*&)glUniform3f=(void*)wglGetProcAddress("glUniform3f");
+					(void*&)glUniform3fv=(void*)wglGetProcAddress("glUniform3fv");
+					(void*&)glUniform3i=(void*)wglGetProcAddress("glUniform3i");
+					(void*&)glUniform3iv=(void*)wglGetProcAddress("glUniform3iv");
+					(void*&)glUniform4f=(void*)wglGetProcAddress("glUniform4f");
+					(void*&)glUniform4fv=(void*)wglGetProcAddress("glUniform4fv");
+					(void*&)glUniform4i=(void*)wglGetProcAddress("glUniform4i");
+					(void*&)glUniform4iv=(void*)wglGetProcAddress("glUniform4iv");
+					(void*&)glUniformMatrix2fv=(void*)wglGetProcAddress("glUniformMatrix2fv");
+					(void*&)glUniformMatrix3fv=(void*)wglGetProcAddress("glUniformMatrix3fv");
+					(void*&)glUniformMatrix4fv=(void*)wglGetProcAddress("glUniformMatrix4fv");
+					(void*&)glGetAttribLocation=(void*)wglGetProcAddress("glGetAttribLocation");
 					
 				} else {
 					//not supported
@@ -171,6 +216,7 @@ class ShaderProgramNative : public Object {
 	ShaderProgramNative();
 	
 	static bool startLocked;
+	static bool onRenderActive;
 	
 	GLuint program;
 	bool used;
@@ -181,6 +227,10 @@ class ShaderProgramNative : public Object {
 	bool _Link();
 	bool _Start();
 	bool _Finish();
+	int _GetUniformLocation(String name);
+	bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei count,int size);
+	bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size);
+	
 };
 
 
@@ -335,6 +385,7 @@ bool ShaderNative::_HasSource() {
 
 // --- ShaderProgram class ---
 bool ShaderProgramNative::startLocked = false;
+bool ShaderProgramNative::onRenderActive = false;
 
 //constructor/destructor
 ShaderProgramNative::ShaderProgramNative() {
@@ -371,7 +422,10 @@ bool ShaderProgramNative::_Attach(ShaderNative *shader) {
 		glAttachShader(program,shader->shader);
 		
 		//check for error
-		if (glGetError() != GL_NO_ERROR) { return false; }
+		GLenum error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+			return false;
+		}
 		
 		//success
 		return true;
@@ -389,7 +443,10 @@ bool ShaderProgramNative::_Detach(ShaderNative *shader) {
 		glDetachShader(program,shader->shader);
 		
 		//check for error
-		if (glGetError() != GL_NO_ERROR) { return false; }
+		GLenum error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+			return false;
+		}
 		
 		//success
 		return true;
@@ -407,7 +464,10 @@ bool ShaderProgramNative::_Link() {
 		glLinkProgram(program);
 		
 		//check for error
-		if (glGetError() != GL_NO_ERROR) { return false; }
+		GLenum error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+			return false;
+		}
 		
 		//success
 		return true;
@@ -421,14 +481,27 @@ bool ShaderProgramNative::_Start() {
 	// --- use program ---
 	//are we supported?
 	if (capabilitySupportedShaders && startLocked == false && used == false) {
-		//make monkey flush itself
-		bb_graphics_renderDevice->Flush();
-		
+		//check if mojo is current rendering
+		if (bb_graphics_renderDevice == 0) {
+			//we are rendering to the fbo outside of OnRender()
+			onRenderActive = false;
+			
+		} else {
+			//not rendering
+			onRenderActive = true;
+			
+			//make monkey flush itself
+			bb_graphics_renderDevice->Flush();
+		}
+				
 		//use program
 		glUseProgram(program);
 		
 		//check for error
-		if (glGetError() != GL_NO_ERROR) { return false; }
+		GLenum error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+			return false;
+		}
 		
 		//flag using
 		used = true;
@@ -445,8 +518,11 @@ bool ShaderProgramNative::_Start() {
 bool ShaderProgramNative::_Finish() {
 	// --- stop using this program ---
 	if (used) {
-		//make monkey flush itself
-		bb_graphics_renderDevice->Flush();
+		//check if we are in onrender
+		if (onRenderActive) {
+			//make monkey flush itself
+			bb_graphics_renderDevice->Flush();
+		}
 		
 		//unuse program
 		glUseProgram(0);
@@ -455,7 +531,10 @@ bool ShaderProgramNative::_Finish() {
 		startLocked = false;
 			
 		//check for error
-		if (glGetError() != GL_NO_ERROR) { return false; }
+		GLenum error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+			return false;
+		}
 			
 		//success
 		return true;
@@ -464,6 +543,164 @@ bool ShaderProgramNative::_Finish() {
 	//fail
 	return false;
 }
+
+GLint ShaderProgramNative::_GetUniformLocation(String name) {
+	// --- get location of a uniform ---
+	//this location int wont change again until the program is relinked so can be reused
+	const GLchar *theName = name.ToCString<GLchar>();
+	GLint location = glGetUniformLocation(program,theName);
+	Print(theName);
+	delete theName;
+	
+	//check for error
+	GLenum error = glGetError();
+	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+		//fail
+		return -1;
+	}
+	
+	//success
+	return location;
+}
+
+bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei count,int size) {
+	// --- set int uniform ---
+	if (location = -1) {
+		return false;
+	}
+	
+	//check size
+	switch(size) {
+		case 1:
+			if (count == 1) {
+				//single int
+				//call apropriate gl function
+				glUniform1i(location,values[0]);
+				
+			} else {
+				//array of ints
+				//call apropriate gl function
+				glUniform1iv(location,count,&values[0]);
+			}
+			break;
+		case 2:
+			if (count == 1) {
+				//single int vec2
+				//call apropriate gl function
+				glUniform2i(location,values[0],values[1]);
+			} else {
+				//array of int vec2
+				//call apropriate gl function
+				glUniform2iv(location,count,&values[0]);
+			}
+			break;
+		case 3:
+			if (count == 1) {
+				//single int vec3
+				//call apropriate gl function
+				glUniform3i(location,values[0],values[1],values[2]);
+			} else {
+				//array of int vec3
+				//call apropriate gl function
+				glUniform3iv(location,count,&values[0]);
+			}
+			break;
+		case 4:
+			if (count == 1) {
+				//single int vec4
+				//call apropriate gl function
+				glUniform4i(location,values[0],values[1],values[2],values[3]);
+			} else {
+				//array of int vec4
+				//call apropriate gl function
+				glUniform4iv(location,count,&values[0]);
+			}
+			break;
+		default:
+			//failed
+			return false;
+			break;
+	}
+	
+	//check for error
+	GLenum error = glGetError();
+	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+		return false;
+	}
+	
+	//sucess :D
+	return true;
+}
+
+bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size) {
+	// --- set int uniform ---
+	if (location = -1) {
+		return false;
+	}
+	
+	//check size
+	switch(size) {
+		case 1:
+			if (count == 1) {
+				//single float
+				//call apropriate gl function
+				glUniform1f(location,values[0]);
+				
+			} else {
+				//array of floats
+				//call apropriate gl function
+				glUniform1fv(location,count,&values[0]);
+			}
+			break;
+		case 2:
+			if (count == 1) {
+				//single float vec2
+				//call apropriate gl function
+				glUniform2f(location,values[0],values[1]);
+			} else {
+				//array of float vec2
+				//call apropriate gl function
+				glUniform2fv(location,count,&values[0]);
+			}
+			break;
+		case 3:
+			if (count == 1) {
+				//single float vec3
+				//call apropriate gl function
+				glUniform3f(location,values[0],values[1],values[2]);
+			} else {
+				//array of float vec3
+				//call apropriate gl function
+				glUniform3fv(location,count,&values[0]);
+			}
+			break;
+		case 4:
+			if (count == 1) {
+				//single float vec4
+				//call apropriate gl function
+				glUniform4f(location,values[0],values[1],values[2],values[3]);
+			} else {
+				//array of float vec4
+				//call apropriate gl function
+				glUniform4fv(location,count,&values[0]);
+			}
+			break;
+		default:
+			//failed
+			return false;
+			break;
+	}
+	
+	//check for error
+	GLenum error = glGetError();
+	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+		return false;
+	}
+	
+	//sucess :D
+	return true;
+}
+
 
 
 
