@@ -53,6 +53,7 @@ void(__stdcall*glUniformMatrix2fv)(GLint location, GLsizei count, GLboolean tran
 void(__stdcall*glUniformMatrix3fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 void(__stdcall*glUniformMatrix4fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 int(__stdcall*glGetAttribLocation)(GLuint program, const GLchar* name);
+void(__stdcall*glGetProgramInfoLog)(GLuint program, GLsizei bufsize, GLsizei* length, GLchar* infolog);
 
 
 
@@ -68,6 +69,7 @@ int(__stdcall*glGetAttribLocation)(GLuint program, const GLchar* name);
 #define GL_INFO_LOG_LENGTH 0x8B84
 #define GL_ATTACHED_SHADERS 0x8B85
 #define GL_SHADER_SOURCE_LENGTH 0x8B88
+#define GL_LINK_STATUS 0x8B82
 
 
 
@@ -177,6 +179,7 @@ static void LoadGraphicsCapability(int capability) {
 					(void*&)glUniformMatrix3fv=(void*)wglGetProcAddress("glUniformMatrix3fv");
 					(void*&)glUniformMatrix4fv=(void*)wglGetProcAddress("glUniformMatrix4fv");
 					(void*&)glGetAttribLocation=(void*)wglGetProcAddress("glGetAttribLocation");
+					(void*&)glGetProgramInfoLog=(void*)wglGetProcAddress("glGetProgramInfoLog");
 					
 				} else {
 					//not supported
@@ -198,11 +201,13 @@ class ShaderNative : public Object {
 	ShaderNative();
 	
 	GLuint shader;
-	String compileError;
+	GLenum error;
+	String customError;
 	bool valid;
 	
 	bool _Init(int type);
 	bool _SetSource(String source);
+	bool _HasError();
 	String _GetError();
 	bool _IsValid();
 	bool _HasSource();
@@ -219,6 +224,8 @@ class ShaderProgramNative : public Object {
 	static bool onRenderActive;
 	
 	GLuint program;
+	GLenum error;
+	String customError;
 	bool used;
 	
 	bool _Init();
@@ -227,6 +234,8 @@ class ShaderProgramNative : public Object {
 	bool _Link();
 	bool _Start();
 	bool _Finish();
+	bool _HasError();
+	String _GetError();
 	int _GetUniformLocation(String name);
 	bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei count,int size);
 	bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size);
@@ -268,7 +277,6 @@ class FBONative : public Object {
 //constructor/destructor
 ShaderNative::ShaderNative() {
 	shader = 0;
-	compileError = String();
 	valid = false;
 }
 
@@ -290,6 +298,7 @@ bool ShaderNative::_Init(int type) {
 				break;
 			default:
 				//fail
+				customError = "Invalid Shader Type";
 				return false;
 				break;
 		}
@@ -317,34 +326,38 @@ bool ShaderNative::_SetSource(String source) {
 		//set the shaders source
 		glShaderSource(shader,1,&theSource,NULL);
 		
-		//compile the source
-		glCompileShader(shader);
-		
 		//free the source
 		delete theSource;
 		
+		//check for error
+		error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+			return false;
+		}
+		
+		//compile the source
+		glCompileShader(shader);
+		
 		//check if the shader compiled
-		GLint compiled;
-		glGetProgramiv(shader, GL_COMPILE_STATUS, &compiled);
-		if (compiled == 0) {
+		GLint status;
+		glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+		if (status == GL_FALSE) {
 			//failed
-			//get the compile error
-			GLint blen = 0;	
-			GLsizei slen = 0;
-
-			glGetShaderiv(shader, GL_INFO_LOG_LENGTH , &blen);       
-			if (blen > 1) {
-				//has error
- 				GLchar* compilerLog = (GLchar*)malloc(blen);
- 				glGetShaderInfoLog(shader, blen, &slen, compilerLog);
-				compileError = String(compilerLog);
- 				delete compilerLog;
-			} else {
-				//no error
-				compileError = String();
-			}
+			GLint infoLogLength;
+	        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLength);
+			
+	        GLchar *strInfoLog = new GLchar[infoLogLength + 1];
+	        glGetShaderInfoLog(shader, infoLogLength, NULL, strInfoLog);
+			customError = String(strInfoLog);
+			delete strInfoLog;
 			
 			//fail
+			return false;
+		}
+		
+		//check for error
+		error = glGetError();
+		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 			return false;
 		}
 		
@@ -357,9 +370,36 @@ bool ShaderNative::_SetSource(String source) {
 	return false;
 }
 
+bool ShaderNative::_HasError() {
+	// --- get last error code ---
+	return error != GL_NO_ERROR || customError.Length() > 0;
+}
+
 String ShaderNative::_GetError() {
-	// --- return the last compile error ---
-	return compileError;
+	// --- return last error as string ---
+	if (_HasError()) {
+		//reset stored errors
+		int theError = (int)error;
+		error = GL_NO_ERROR;
+		String theCustomError = String(customError);
+		customError = "";
+		
+		//use custo merror
+		if (theCustomError.Length() > 0) {
+			return theCustomError;
+		} else {
+			switch(theError) {
+				case GL_INVALID_VALUE:
+					return String("GL_INVALID_VALUE");
+					break;
+				case GL_INVALID_OPERATION:
+					return String("GL_INVALID_OPERATION");
+					break;
+			}
+		}
+	}
+	
+	return String();
 }
 
 bool ShaderNative::_IsValid() {
@@ -422,7 +462,7 @@ bool ShaderProgramNative::_Attach(ShaderNative *shader) {
 		glAttachShader(program,shader->shader);
 		
 		//check for error
-		GLenum error = glGetError();
+		error = glGetError();
 		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 			return false;
 		}
@@ -443,7 +483,7 @@ bool ShaderProgramNative::_Detach(ShaderNative *shader) {
 		glDetachShader(program,shader->shader);
 		
 		//check for error
-		GLenum error = glGetError();
+		error = glGetError();
 		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 			return false;
 		}
@@ -456,15 +496,62 @@ bool ShaderProgramNative::_Detach(ShaderNative *shader) {
 	return false;
 }
 
+bool ShaderProgramNative::_HasError() {
+	// --- get last error code ---
+	return error != GL_NO_ERROR || customError.Length() > 0;
+}
+
+String ShaderProgramNative::_GetError() {
+	// --- return last error as string ---
+	if (_HasError()) {
+		//reset stored errors
+		int theError = (int)error;
+		error = GL_NO_ERROR;
+		String theCustomError = String(customError);
+		customError = "";
+		
+		//use custo merror
+		if (theCustomError.Length() > 0) {
+			return theCustomError;
+		} else {
+			switch(theError) {
+				case GL_INVALID_VALUE:
+					return String("GL_INVALID_VALUE");
+					break;
+				case GL_INVALID_OPERATION:
+					return String("GL_INVALID_OPERATION");
+					break;
+			}
+		}
+	}
+	
+	return String();
+}
+
 bool ShaderProgramNative::_Link() {
 	// --- link shaders into program ---
 	//are we supported?
 	if (capabilitySupportedShaders) {
-		//attach
+		//link
 		glLinkProgram(program);
 		
+		//check for error linking
+		GLint status;
+    	glGetProgramiv (program, GL_LINK_STATUS, &status);
+    	if (status == GL_FALSE) {
+        	GLint infoLogLength;
+        	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
+        
+       		GLchar *strInfoLog = new GLchar[infoLogLength + 1];
+       		glGetProgramInfoLog(program, infoLogLength, NULL, strInfoLog);
+			customError = String(strInfoLog);
+       		delete[] strInfoLog;
+			
+			return false;
+    	}
+		
 		//check for error
-		GLenum error = glGetError();
+		error = glGetError();
 		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 			return false;
 		}
@@ -498,7 +585,7 @@ bool ShaderProgramNative::_Start() {
 		glUseProgram(program);
 		
 		//check for error
-		GLenum error = glGetError();
+		error = glGetError();
 		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 			return false;
 		}
@@ -522,6 +609,13 @@ bool ShaderProgramNative::_Finish() {
 		if (onRenderActive) {
 			//make monkey flush itself
 			bb_graphics_renderDevice->Flush();
+		/*} else {
+			//finish it please!
+
+			error = glGetError();
+			if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+				return false;
+			}*/
 		}
 		
 		//unuse program
@@ -531,7 +625,7 @@ bool ShaderProgramNative::_Finish() {
 		startLocked = false;
 			
 		//check for error
-		GLenum error = glGetError();
+		error = glGetError();
 		if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 			return false;
 		}
@@ -549,11 +643,10 @@ GLint ShaderProgramNative::_GetUniformLocation(String name) {
 	//this location int wont change again until the program is relinked so can be reused
 	const GLchar *theName = name.ToCString<GLchar>();
 	GLint location = glGetUniformLocation(program,theName);
-	Print(theName);
 	delete theName;
 	
 	//check for error
-	GLenum error = glGetError();
+	error = glGetError();
 	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 		//fail
 		return -1;
@@ -565,7 +658,7 @@ GLint ShaderProgramNative::_GetUniformLocation(String name) {
 
 bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei count,int size) {
 	// --- set int uniform ---
-	if (location = -1) {
+	if (location == -1) {
 		return false;
 	}
 	
@@ -623,7 +716,7 @@ bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei
 	}
 	
 	//check for error
-	GLenum error = glGetError();
+	error = glGetError();
 	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 		return false;
 	}
@@ -634,7 +727,7 @@ bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei
 
 bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size) {
 	// --- set int uniform ---
-	if (location = -1) {
+	if (location == -1) {
 		return false;
 	}
 	
@@ -692,7 +785,7 @@ bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLs
 	}
 	
 	//check for error
-	GLenum error = glGetError();
+	error = glGetError();
 	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
 		return false;
 	}

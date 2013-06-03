@@ -26,8 +26,9 @@ Extern
 	Class ShaderNative
 		Private
 		Method _Init:bool(type:Int)
-		Method _SetSource:Bool(source:String)
 		Public
+		Method SetSource:Bool(source:String) = "_SetSource"
+		Method HasError:Bool() = "_HasError"
 		Method GetError:String() = "_GetError"
 		Method IsValid:Bool() = "_IsValid"
 		Method HasSource:Bool() = "_HasSource"	
@@ -39,6 +40,8 @@ Extern
 		Method _Attach:Bool(shader:ShaderNative)
 		Method _Detach:Bool(shader:ShaderNative)
 		Public
+		Method HasError:Bool() = "_HasError"
+		Method GetError:String() = "_GetError"
 		Method Link:Bool() = "_Link"
 		Method Start:Bool() = "_Start"
 		Method Finish:Bool() = "_Finish"
@@ -88,14 +91,9 @@ Const FRAGMENT_SHADER:= 2
 			If _Init(type) = False Error("Error Creating Shader")
 		End
 		
-		Method SetSource:Bool(source:String)
-			' --- change source of shader ---
-			Return _SetSource(source)
-		End
-		
 		Method Clear:Bool()
 			' --- clear this shader ---
-			_SetSource("")
+			SetSource("")
 			Return True
 		End
 	End
@@ -156,7 +154,7 @@ Const FRAGMENT_SHADER:= 2
 			tempIntVec[0] = value
 			
 			'call the correct native method
-			Return _SetUniformInt(location, tempIntVec, 1, 1);
+			Return _SetUniformInt(location, tempIntVec, 1, 1)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Int, y:Int)
@@ -167,7 +165,7 @@ Const FRAGMENT_SHADER:= 2
 			tempIntVec[1] = y
 			
 			'call the correct native method
-			Return _SetUniformInt(location, tempIntVec, 1, 2);
+			Return _SetUniformInt(location, tempIntVec, 1, 2)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Int, y:Int, z:Int)
@@ -179,7 +177,7 @@ Const FRAGMENT_SHADER:= 2
 			tempIntVec[2] = z
 			
 			'call the correct native method
-			Return _SetUniformInt(location, tempIntVec, 1, 3);
+			Return _SetUniformInt(location, tempIntVec, 1, 3)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Int, y:Int, z:Int, w:Int)
@@ -192,7 +190,7 @@ Const FRAGMENT_SHADER:= 2
 			tempIntVec[3] = w
 			
 			'call the correct native method
-			Return _SetUniformInt(location, tempIntVec, 1, 4);
+			Return _SetUniformInt(location, tempIntVec, 1, 4)
 		End
 		
 		Method SetUniform:Bool(location:Int, values:Int[], count:Int)
@@ -211,7 +209,7 @@ Const FRAGMENT_SHADER:= 2
 			EndIf
 			
 			'call the correct native method
-			Return _SetUniformInt(location, values, count, 1);
+			Return _SetUniformInt(location, values, count, 1)
 		End
 		
 		Method SetUniform:Bool(location:Int, values:Int[], size:Int, count:Int)
@@ -237,7 +235,7 @@ Const FRAGMENT_SHADER:= 2
 			EndIf
 			
 			'call the correct native method
-			Return _SetUniformInt(location, values, count, size);
+			Return _SetUniformInt(location, values, count, size)
 		End
 		
 		Method SetUniform:Bool(location:Int, value:Float)
@@ -247,7 +245,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[0] = value
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 1);
+			Return _SetUniformFloat(location, tempFloatVec, 1, 1)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Float, y:Float)
@@ -258,7 +256,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[1] = y
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 2);
+			Return _SetUniformFloat(location, tempFloatVec, 1, 2)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Float, y:Float, z:Float)
@@ -270,7 +268,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[2] = z
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 3);
+			Return _SetUniformFloat(location, tempFloatVec, 1, 3)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Float, y:Float, z:Float, w:Float)
@@ -283,7 +281,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[3] = w
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 4);
+			Return _SetUniformFloat(location, tempFloatVec, 1, 4)
 		End
 		
 		Method SetUniform:Bool(location:Int, values:Float[], count:Int)
@@ -302,7 +300,7 @@ Const FRAGMENT_SHADER:= 2
 			EndIf
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, values, count, 1);
+			Return _SetUniformFloat(location, values, count, 1)
 		End
 		
 		Method SetUniform:Bool(location:Int, values:Float[], size:Int, count:Int)
@@ -328,7 +326,7 @@ Const FRAGMENT_SHADER:= 2
 			EndIf
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, values, count, size);
+			Return _SetUniformFloat(location, values, count, size)
 		End
 		
 		'uniform lazy api (provide location as a string)
