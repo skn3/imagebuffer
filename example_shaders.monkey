@@ -12,12 +12,9 @@ Function Main:Int()
 End
 
 Class MyApp Extends App
-	Field image:Image
-	Field shaderProgram:ShaderProgram
-	Field shaderVert:Shader
-	Field shaderFragment:Shader
-	Field shaderTotal:Int = 2
-	Field shaderIndex:Int = 0
+	Field shaderExamples:= New List<ShaderExample>
+	Field currentExampleNode:list.Node<ShaderExample>
+	Field currentExample:ShaderExample
 	
 	Method OnCreate:Int()
 		' --- setup the game ---
@@ -26,14 +23,10 @@ Class MyApp Extends App
 		'do basic shaders check
 		If CheckGraphicsCapability(GRAPHICS_CAPABILITY_SHADERS) = False Error("Not supported sorry!")
 		
-		'load an image
-		image = LoadImage("image.png", 1, Image.MidHandle)
+		'create examples
+		shaderExamples.AddLast(New ShaderExample1)
+		shaderExamples.AddLast(New ShaderExample2)
 		
-		'create a shaders
-		shaderProgram = New ShaderProgram()
-		shaderVert = New Shader(VERTEX_SHADER)
-		shaderFragment = New Shader(FRAGMENT_SHADER)
-				
 		'setup first shader source
 		NextShader()
 		
@@ -43,8 +36,10 @@ Class MyApp Extends App
 	Method OnUpdate:Int()
 		' --- update the game ---
 		If KeyHit(KEY_ESCAPE) Error("")
-		
 		If MouseHit(MOUSE_LEFT) NextShader()
+		
+		'update example
+		If currentExample currentExample.OnUpdate()
 		
 		Return 0
 	End
@@ -53,121 +48,138 @@ Class MyApp Extends App
 		' --- render the game ---
 		Cls(180, 180, 180)
 		
-		'experiment
-		If shaderProgram.Start() = False
-			If KeyDown(KEY_SPACE) Print "Start Shader Program: Failed - " + shaderProgram.GetError()
-		Else
-			If KeyDown(KEY_SPACE) Print "Start Shader Program: Success!"
-				
-			DrawImage(image, MouseX(), MouseY())
-			
-			If shaderProgram.Finish() = False
-				If KeyDown(KEY_SPACE) Print "Finish Shader Program: Failed - " + shaderProgram.GetError()
-			Else
-				If KeyDown(KEY_SPACE) Print "Finish Shader Program: Success!"
-			EndIf
-		EndIf
+		'render example
+		If currentExample currentExample.OnRender()
 		
 		Return 0
 	End
 	
 	Method NextShader:Void()
 		' --- helper to switch to next shader ---
-		shaderIndex += 1
-		If shaderIndex > shaderTotal shaderIndex = 1
+		'finish old example
+		If currentExample currentExample.OnFinish()
 		
-		'clear previous attachments
-		shaderProgram.Clear()
-		shaderVert.Clear()
-		shaderFragment.Clear()
+		'get the next shader example
+		If currentExampleNode currentExampleNode = currentExampleNode.NextNode()
+		If currentExampleNode = Null currentExampleNode = shaderExamples.FirstNode()
+		currentExample = currentExampleNode.Value()
 		
-		'set shader files to load
-		Local fileVert:String
-		Local fileFrag:String
-		Select shaderIndex
-			Case 1
-				fileFrag = "shader1.frag"
+		'start new example
+		currentExample.OnStart()
+	End
+End
+
+Class ShaderExample Abstract
+	Method OnStart:Void() Abstract
+	Method OnFinish:Void() Abstract
+	Method OnUpdate:Void() Abstract
+	Method OnRender:Void() Abstract
+End
+
+Class ShaderExample1 Extends ShaderExample
+	Field program:ShaderProgram
+	Field fragShader:Shader
+	Field angleLocation:Int
+	Field angle:Float
+	
+	Method OnStart:Void()
+		' --- setup example ---
+		program = New ShaderProgram()
+		fragShader = New Shader(FRAGMENT_SHADER)
+		
+		'frag shader
+		If fragShader.SetSource(LoadString("example1.frag")) = False
+			Print "shader compile error: ~n" + fragShader.GetError()
+		EndIf
+		program.Attach(fragShader)
+		
+		'link
+		If program.Link() = False
+			Print "shader program link error: ~n" + program.GetError()
+		EndIf
+		
+		'get uniform locations
+		angleLocation = program.GetUniformLocation("angle")
+	End
+	
+	Method OnFinish:Void()
+		' --- free example ---
+		fragShader.Free()
+		program.Free()
+	End
+	
+	Method OnUpdate:Void()
+		' --- update example ---
+		angle += 0.01
+	End
+	
+	Method OnRender:Void()
+		' --- render example ---
+		program.Start()
+		
+		'modify the shader based on mouse position
+		program.SetUniform(angleLocation, angle)
+		
+		DrawRect(MouseX() -100, MouseY() -100, 200, 200)
+		program.Finish()
+	End
+End
+
+Class ShaderExample2 Extends ShaderExample
+	Field image:Image
+	Field program:ShaderProgram
+	Field vertShader:Shader
+	Field fragShader:Shader
+	Field timeLocation:Int
+	
+	Method OnStart:Void()
+		' --- setup example ---
+		image = LoadImage("smiles.png", 1, Image.MidHandle)
+		program = New ShaderProgram()
+		vertShader = New Shader(VERTEX_SHADER)
+		fragShader = New Shader(FRAGMENT_SHADER)
+
+		'vert shader
+		If vertShader.SetSource(LoadString("example2.vert")) = False
+			Print "shader compile error: ~n" + vertShader.GetError()
+		EndIf
+		program.Attach(fragShader)
 				
-			Case 2
-				fileVert = "shader2.vert"
-				fileFrag = "shader2.frag"
-		End
+		'frag shader
+		If fragShader.SetSource(LoadString("example2.frag")) = False
+			Print "shader compile error: ~n" + fragShader.GetError()
+		EndIf
+		program.Attach(fragShader)
 		
-		'load vert shader
-		If fileVert.Length = 0
-			'no vert shader
-		Else
-			'has vert shader
-			If shaderVert.SetSource(LoadString(fileVert)) = False
-				Print "Set Shader '" + fileVert + "' Source: Failed - " + shaderProgram.GetError()
-			Else
-				Print "Set Shader '" + fileVert + "' Source: Success!"
-			EndIf
+		'link
+		If program.Link() = False
+			Print "shader program link error: ~n" + program.GetError()
 		EndIf
 		
-		'load frag shader
-		If fileFrag.Length = 0
-			'no frag shader
-		Else
-			'has frag shader
-			If shaderFragment.SetSource(LoadString(fileFrag)) = False
-				Print "Set Shader '" + fileFrag + "' Source: Failed - " + shaderFragment.GetError()
-			Else
-				Print "Set Shader '" + fileFrag + "' Source: Success!"
-			EndIf
-		EndIf
+		'get uniform locations
+		timeLocation = program.GetUniformLocation("time")
+	End
+	
+	Method OnFinish:Void()
+		' --- free example ---
+		vertShader.Free()
+		fragShader.Free()
+		program.Free()
+	End
+	
+	Method OnUpdate:Void()
+		' --- update example ---
 		
-		'attach shaders to program
-		If shaderVert.HasSource()
-			If shaderProgram.Attach(shaderVert) = False
-				Print "Attach Shader '" + fileVert + "': Failed - " + shaderProgram.GetError()
-			Else
-				Print "Attach Shader '" + fileVert + "': Success!"
-			EndIf
-		EndIf
+	End
+	
+	Method OnRender:Void()
+		' --- render example ---
+		program.Start()
+		'update time
+		program.SetUniform(timeLocation, Float(Millisecs())/1000.0)
 		
-		If shaderFragment.HasSource()
-			If shaderProgram.Attach(shaderFragment) = False
-				Print "Attach Shader '" + fileFrag + "': Failed - " + shaderProgram.GetError()
-			Else
-				Print "Attach Shader '" + fileFrag + "': Success!"
-			EndIf
-		EndIf
-		
-		'link the program
-		If shaderProgram.Link() = False
-			Print "Link Shader Program: Failed - " + shaderProgram.GetError()
-		Else
-			Print "Link Shader Program: Success!"
-		EndIf
-		
-		'test setting a uniform value
-		If shaderProgram.Start() = False
-			Print "Start Shader Program: Failed - " + shaderProgram.GetError()
-		Else
-			Print "Start Shader Program: Success!"
-			
-			Local id:= "testing123"
-			Local value:= 123
-			Local location:= shaderProgram.GetUniformLocation(id)
-			
-			If location = -1
-				Print "Get Shader Program Uniform Location: Failed - " + shaderProgram.GetError()
-			Else
-				Print "Get Shader Program Uniform Location: Success! (location = '" + location + "')"
-				
-				If shaderProgram.SetUniform(location, value) = False
-					Print "Set Shader Program Uniform '" + id + "' to '" + value + "': Failed - " + shaderProgram.GetError()
-				Else
-					Print "Set Shader Program Uniform '" + id + "' to '" + value + "': Success!"
-				EndIf
-			EndIf
-			
-			If shaderProgram.Finish() = False
-				Print "Finish Shader Program: Failed - " + shaderProgram.GetError()
-			Else
-				Print "Finish Shader Program: Success!"
-			EndIf
-		EndIf
+		'draw image
+		DrawImage(image, MouseX(), MouseY())
+		program.Finish()
 	End
 End

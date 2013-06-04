@@ -21,12 +21,14 @@ void(__stdcall*glDeleteRenderbuffers)(GLsizei n, const GLuint* renderbuffers);
 GLuint(__stdcall*glCreateShader)(GLenum type);
 void(__stdcall*glShaderSource)(GLuint shader, GLsizei count, const GLchar** string, const GLint* length);
 void(__stdcall*glCompileShader)(GLuint shader);
-void(__stdcall*glGetProgramiv)(GLuint program, GLenum pname, GLint* params);
 void(__stdcall*glGetShaderiv)(GLuint shader, GLenum pname, GLint* params);
 void(__stdcall*glGetShaderInfoLog)(GLuint shader, GLsizei bufsize, GLsizei* length, GLchar* infolog);
-GLuint(__stdcall*glCreateProgram)(void);
 void(__stdcall*glAttachShader)(GLuint program, GLuint shader);
 void(__stdcall*glDetachShader)(GLuint program, GLuint shader);
+void(__stdcall*glDeleteShader)(GLuint shader);
+GLuint(__stdcall*glCreateProgram)(void);
+void(__stdcall*glDeleteProgram)(GLuint program);
+void(__stdcall*glGetProgramiv)(GLuint program, GLenum pname, GLint* params);
 void(__stdcall*glLinkProgram)(GLuint program);
 void(__stdcall*glUseProgram)(GLuint program);
 void(__stdcall*glGetShaderSource)(GLuint shader, GLsizei bufsize, GLsizei* length, GLchar* source);
@@ -70,6 +72,10 @@ void(__stdcall*glGetProgramInfoLog)(GLuint program, GLsizei bufsize, GLsizei* le
 #define GL_ATTACHED_SHADERS 0x8B85
 #define GL_SHADER_SOURCE_LENGTH 0x8B88
 #define GL_LINK_STATUS 0x8B82
+#define GL_ACTIVE_UNIFORMS 0x8B86
+#define GL_ACTIVE_UNIFORM_MAX_LENGTH 0x8B87
+#define GL_ACTIVE_ATTRIBUTES 0x8B89
+#define GL_ACTIVE_ATTRIBUTE_MAX_LENGTH 0x8B8A
 
 
 
@@ -147,12 +153,14 @@ static void LoadGraphicsCapability(int capability) {
 					(void*&)glCreateShader=(void*)wglGetProcAddress("glCreateShader");
 					(void*&)glShaderSource=(void*)wglGetProcAddress("glShaderSource");
 					(void*&)glCompileShader=(void*)wglGetProcAddress("glCompileShader");
-					(void*&)glGetProgramiv=(void*)wglGetProcAddress("glGetProgramiv");
 					(void*&)glGetShaderiv=(void*)wglGetProcAddress("glGetShaderiv");
 					(void*&)glGetShaderInfoLog=(void*)wglGetProcAddress("glGetShaderInfoLog");
-					(void*&)glCreateProgram=(void*)wglGetProcAddress("glCreateProgram");
 					(void*&)glAttachShader=(void*)wglGetProcAddress("glAttachShader");
 					(void*&)glDetachShader=(void*)wglGetProcAddress("glDetachShader");
+					(void*&)glDeleteShader=(void*)wglGetProcAddress("glDeleteShader");
+					(void*&)glCreateProgram=(void*)wglGetProcAddress("glCreateProgram");
+					(void*&)glDeleteProgram=(void*)wglGetProcAddress("glDeleteProgram");
+					(void*&)glGetProgramiv=(void*)wglGetProcAddress("glGetProgramiv");
 					(void*&)glLinkProgram=(void*)wglGetProcAddress("glLinkProgram");
 					(void*&)glUseProgram=(void*)wglGetProcAddress("glUseProgram");
 					(void*&)glGetShaderSource=(void*)wglGetProcAddress("glGetShaderSource");
@@ -206,6 +214,7 @@ class ShaderNative : public Object {
 	bool valid;
 	
 	bool _Init(int type);
+	bool _Free();
 	bool _SetSource(String source);
 	bool _HasError();
 	String _GetError();
@@ -220,6 +229,7 @@ class ShaderProgramNative : public Object {
 	public:
 	ShaderProgramNative();
 	
+	static GLuint activeProgram;
 	static bool startLocked;
 	static bool onRenderActive;
 	
@@ -229,6 +239,7 @@ class ShaderProgramNative : public Object {
 	bool used;
 	
 	bool _Init();
+	bool _Free();
 	bool _Attach(ShaderNative *shader);
 	bool _Detach(ShaderNative *shader);
 	bool _Link();
@@ -306,6 +317,22 @@ bool ShaderNative::_Init(int type) {
 		//create the shader
 		shader = glCreateShader(shaderType);
 		if (shader == 0) { return false; }
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+bool ShaderNative::_Free() {
+	// --- free the shader ---
+	if (capabilitySupportedShaders && valid) {
+		//if this shader is still attached it will only be flagged for deletion
+		valid = false;
+		glDeleteShader(shader);
+		shader = 0;
 		
 		//success
 		return true;
@@ -424,6 +451,7 @@ bool ShaderNative::_HasSource() {
 
 
 // --- ShaderProgram class ---
+GLuint ShaderProgramNative::activeProgram = 0;
 bool ShaderProgramNative::startLocked = false;
 bool ShaderProgramNative::onRenderActive = false;
 
@@ -445,6 +473,27 @@ bool ShaderProgramNative::_Init() {
 			//fail
 			return false;
 		}
+		
+		//success
+		return true;
+	}
+	
+	//fail
+	return false;
+}
+
+bool ShaderProgramNative::_Free() {
+	// --- free the shader program ---
+	if (capabilitySupportedShaders) {
+		//if program is in use it will be flagged for deletion
+		//we want to avoid this so force end here
+		if (used) {
+			_Finish();
+		}
+		
+		//delete program
+		glDeleteProgram(program);
+		program = 0;
 		
 		//success
 		return true;
@@ -566,6 +615,12 @@ bool ShaderProgramNative::_Link() {
 
 bool ShaderProgramNative::_Start() {
 	// --- use program ---
+	//check to see if this program is already in use
+	if (activeProgram == program) {
+		//dont need to do anything as it is already active
+		return true;
+	}
+	
 	//are we supported?
 	if (capabilitySupportedShaders && startLocked == false && used == false) {
 		//check if mojo is current rendering
@@ -591,6 +646,7 @@ bool ShaderProgramNative::_Start() {
 		}
 		
 		//flag using
+		activeProgram = program;
 		used = true;
 		startLocked = true;
 		
@@ -621,6 +677,8 @@ bool ShaderProgramNative::_Finish() {
 		//unuse program
 		glUseProgram(0);
 	
+		//unflag using
+		activeProgram = 0;
 		used = false;
 		startLocked = false;
 			
@@ -641,7 +699,7 @@ bool ShaderProgramNative::_Finish() {
 GLint ShaderProgramNative::_GetUniformLocation(String name) {
 	// --- get location of a uniform ---
 	//this location int wont change again until the program is relinked so can be reused
-	const GLchar *theName = name.ToCString<GLchar>();
+	GLchar *theName = name.ToCString<GLchar>();
 	GLint location = glGetUniformLocation(program,theName);
 	delete theName;
 	
@@ -658,6 +716,12 @@ GLint ShaderProgramNative::_GetUniformLocation(String name) {
 
 bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei count,int size) {
 	// --- set int uniform ---
+	//make sure the program is active
+	if (used == false) {
+		customError = "Cant modify uniform when shader program isn't active";
+		return false;
+	}
+	
 	if (location == -1) {
 		return false;
 	}
@@ -727,6 +791,12 @@ bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei
 
 bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size) {
 	// --- set int uniform ---
+	//make sure the program is active
+	if (used == false) {
+		customError = "Cant modify uniform when shader program isn't active";
+		return false;
+	}
+	
 	if (location == -1) {
 		return false;
 	}

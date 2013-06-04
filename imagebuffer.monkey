@@ -1,5 +1,9 @@
 Strict
 
+'version 5
+' - shaders are now usable
+' - examples updated to be contained in class applets
+' - set uniforms fully working (no matrix yet)
 'version 4
 ' - started to add some shader support
 'version 3
@@ -26,6 +30,7 @@ Extern
 	Class ShaderNative
 		Private
 		Method _Init:bool(type:Int)
+		Method _Free:Bool()
 		Public
 		Method SetSource:Bool(source:String) = "_SetSource"
 		Method HasError:Bool() = "_HasError"
@@ -37,6 +42,7 @@ Extern
 	Class ShaderProgramNative
 		Private
 		Method _Init:Bool()
+		Method _Free:Bool()
 		Method _Attach:Bool(shader:ShaderNative)
 		Method _Detach:Bool(shader:ShaderNative)
 		Public
@@ -53,6 +59,7 @@ Extern
 	Class FBONative
 		Private
 		Method _Init:bool()
+		Method _Free:Bool()
 		Method _Attach:bool(surface:Surface)
 		Method _Detach:bool()
 		Method _Start:bool()
@@ -91,6 +98,11 @@ Const FRAGMENT_SHADER:= 2
 			If _Init(type) = False Error("Error Creating Shader")
 		End
 		
+		Method Free:Void()
+			' --- destructor ---
+			_Free()
+		End
+		
 		Method Clear:Bool()
 			' --- clear this shader ---
 			SetSource("")
@@ -109,6 +121,12 @@ Const FRAGMENT_SHADER:= 2
 		Method New()
 			' --- constructor ---
 			If _Init() = False Error("Error Creating Shader Program")
+		End
+		
+		Method Free:Void()
+			' --- destructor ---
+			Clear()
+			_Free()
 		End
 		
 		Method Attach:Bool(shader:Shader)
@@ -140,7 +158,8 @@ Const FRAGMENT_SHADER:= 2
 			While node
 				delNode = node
 				node = node.NextNode()
-				Detach(delNode.Value())
+				_Detach(delNode.Value())
+				delNode.Remove()
 			Wend
 			
 			Return True
@@ -411,6 +430,11 @@ Const FRAGMENT_SHADER:= 2
 			If _Init() = False Error("Error Creating FBO")
 		End
 		
+		Method Free:Void()
+			' --- destructor ---
+			_Free()
+		End
+		
 		Method SetImage:Void(image:Image)
 			' --- attach or dettach the image to the fbo ---
 			If image = Null
@@ -437,36 +461,6 @@ Const FRAGMENT_SHADER:= 2
 	End
 #else
 	'unsupported device
-	Class FBO
-		Method New()
-			Error("Image Buffer Not Supported")
-		End
-		
-		Method Free:Void()
-		End
-		
-		Method SetImage:Void(image:Image)
-			Error("FBO.SetImage() Failed")
-		End
-		
-		Method Start:Void()
-			Error("FBO.Start() Failed")
-		End
-		
-		Method Finish:Void()
-			Error("FBO.Finish() Failed")
-		End
-		
-		Method Clear:Void(r:float, g:float, b:float, a:float = 255.0)
-			Error("FBO.Clear() Failed")
-		End
-	End
-	
-	' --- functions ---
-	Function CheckGraphicsCapability:Bool(capability:Int)
-		' --- always return false as not supported device ---
-		Return False
-	End
 #end
 
 
