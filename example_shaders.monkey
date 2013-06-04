@@ -181,5 +181,8 @@ Class ShaderExample2 Extends ShaderExample
 		'draw image
 		DrawImage(image, MouseX(), MouseY())
 		program.Finish()
+		
+		Local time:= program.GetUniform(program.GetUniformLocation("time"), 0.0)
+		DrawText(time, 5, 5)
 	End
 End

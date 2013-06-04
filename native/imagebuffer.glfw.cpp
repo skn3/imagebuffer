@@ -52,9 +52,14 @@ void(__stdcall*glUniform4fv)(GLint location, GLsizei count, const GLfloat* v);
 void(__stdcall*glUniform4i)(GLint location, GLint x, GLint y, GLint z, GLint w);
 void(__stdcall*glUniform4iv)(GLint location, GLsizei count, const GLint* v);
 void(__stdcall*glUniformMatrix2fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix2x3fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix2x4fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix3x2fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 void(__stdcall*glUniformMatrix3fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix3x4fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix4x2fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
+void(__stdcall*glUniformMatrix4x3fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 void(__stdcall*glUniformMatrix4fv)(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
-int(__stdcall*glGetAttribLocation)(GLuint program, const GLchar* name);
 void(__stdcall*glGetProgramInfoLog)(GLuint program, GLsizei bufsize, GLsizei* length, GLchar* infolog);
 
 
@@ -184,9 +189,14 @@ static void LoadGraphicsCapability(int capability) {
 					(void*&)glUniform4i=(void*)wglGetProcAddress("glUniform4i");
 					(void*&)glUniform4iv=(void*)wglGetProcAddress("glUniform4iv");
 					(void*&)glUniformMatrix2fv=(void*)wglGetProcAddress("glUniformMatrix2fv");
+					(void*&)glUniformMatrix2x3fv=(void*)wglGetProcAddress("glUniformMatrix2x3fv");
+					(void*&)glUniformMatrix2x4fv=(void*)wglGetProcAddress("glUniformMatrix2x4fv");
+					(void*&)glUniformMatrix3x2fv=(void*)wglGetProcAddress("glUniformMatrix3x2fv");
 					(void*&)glUniformMatrix3fv=(void*)wglGetProcAddress("glUniformMatrix3fv");
+					(void*&)glUniformMatrix3x4fv=(void*)wglGetProcAddress("glUniformMatrix3x4fv");
+					(void*&)glUniformMatrix4x2fv=(void*)wglGetProcAddress("glUniformMatrix4x2fv");
+					(void*&)glUniformMatrix4x3fv=(void*)wglGetProcAddress("glUniformMatrix4x3fv");
 					(void*&)glUniformMatrix4fv=(void*)wglGetProcAddress("glUniformMatrix4fv");
-					(void*&)glGetAttribLocation=(void*)wglGetProcAddress("glGetAttribLocation");
 					(void*&)glGetProgramInfoLog=(void*)wglGetProcAddress("glGetProgramInfoLog");
 					
 				} else {
@@ -248,8 +258,10 @@ class ShaderProgramNative : public Object {
 	bool _HasError();
 	String _GetError();
 	int _GetUniformLocation(String name);
-	bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei count,int size);
-	bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size);
+	bool _SetUniformInt(int location,Array<int > values,GLsizei count,int size);
+	bool _SetUniformFloat(int location,Array<Float > values,GLsizei count,int size,int columns,int rows,GLboolean transpose);
+	bool _GetUniformInt(int location,Array<int > values);
+	bool _GetUniformFloat(int location,Array<float > values);
 	
 };
 
@@ -726,9 +738,11 @@ bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei
 		return false;
 	}
 	
+	//we are setting a value, vector or array
 	//check size
 	switch(size) {
 		case 1:
+			//we are setting a single value, vector or array
 			if (count == 1) {
 				//single int
 				//call apropriate gl function
@@ -789,7 +803,7 @@ bool ShaderProgramNative::_SetUniformInt(int location,Array<int > values,GLsizei
 	return true;
 }
 
-bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size) {
+bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLsizei count,int size, int columns,int rows,GLboolean transpose = GL_FALSE) {
 	// --- set int uniform ---
 	//make sure the program is active
 	if (used == false) {
@@ -801,57 +815,115 @@ bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLs
 		return false;
 	}
 	
-	//check size
-	switch(size) {
-		case 1:
-			if (count == 1) {
-				//single float
-				//call apropriate gl function
-				glUniform1f(location,values[0]);
-				
-			} else {
-				//array of floats
-				//call apropriate gl function
-				glUniform1fv(location,count,&values[0]);
-			}
-			break;
-		case 2:
-			if (count == 1) {
-				//single float vec2
-				//call apropriate gl function
-				glUniform2f(location,values[0],values[1]);
-			} else {
-				//array of float vec2
-				//call apropriate gl function
-				glUniform2fv(location,count,&values[0]);
-			}
-			break;
-		case 3:
-			if (count == 1) {
-				//single float vec3
-				//call apropriate gl function
-				glUniform3f(location,values[0],values[1],values[2]);
-			} else {
-				//array of float vec3
-				//call apropriate gl function
-				glUniform3fv(location,count,&values[0]);
-			}
-			break;
-		case 4:
-			if (count == 1) {
-				//single float vec4
-				//call apropriate gl function
-				glUniform4f(location,values[0],values[1],values[2],values[3]);
-			} else {
-				//array of float vec4
-				//call apropriate gl function
-				glUniform4fv(location,count,&values[0]);
-			}
-			break;
-		default:
-			//failed
-			return false;
-			break;
+	//check for setting matrix
+	if (columns > 1 && rows > 1) {
+		//we are setting a mtrix
+		switch(columns) {
+			case 2:
+				switch(rows) {
+					case 2:
+						glUniformMatrix2fv(location,count,transpose,&values[0]);
+						break;
+					case 3:
+						glUniformMatrix2x3fv(location,count,transpose,&values[0]);
+						break;
+					case 4:
+						glUniformMatrix2x4fv(location,count,transpose,&values[0]);
+						break;
+					default:
+						return false;
+						break;
+				}
+				break;
+			case 3:
+				switch(rows) {
+					case 2:
+						glUniformMatrix3x2fv(location,count,transpose,&values[0]);
+						break;
+					case 3:
+						glUniformMatrix3fv(location,count,transpose,&values[0]);
+						break;
+					case 4:
+						glUniformMatrix3x4fv(location,count,transpose,&values[0]);
+						break;
+					default:
+						return false;
+						break;
+				}
+				break;
+			case 4:
+				switch(rows) {
+					case 2:
+						glUniformMatrix4x2fv(location,count,transpose,&values[0]);
+						break;
+					case 3:
+						glUniformMatrix4x3fv(location,count,transpose,&values[0]);
+						break;
+					case 4:
+						glUniformMatrix4fv(location,count,transpose,&values[0]);
+						break;
+					default:
+						return false;
+						break;
+				}
+				break;
+			default:
+				return false;
+				break;
+		}
+	} else {
+		//check size
+		switch(size) {
+			case 1:
+				if (count == 1) {
+					//single float
+					//call apropriate gl function
+					glUniform1f(location,values[0]);
+					
+				} else {
+					//array of floats
+					//call apropriate gl function
+					glUniform1fv(location,count,&values[0]);
+				}
+				break;
+			case 2:
+				if (count == 1) {
+					//single float vec2
+					//call apropriate gl function
+					glUniform2f(location,values[0],values[1]);
+				} else {
+					//array of float vec2
+					//call apropriate gl function
+					glUniform2fv(location,count,&values[0]);
+				}
+				break;
+			case 3:
+				if (count == 1) {
+					//single float vec3
+					//call apropriate gl function
+					glUniform3f(location,values[0],values[1],values[2]);
+				} else {
+					//array of float vec3
+					//call apropriate gl function
+					glUniform3fv(location,count,&values[0]);
+				}
+				break;
+			case 4:
+				if (count == 1) {
+					//single float vec4
+					//call apropriate gl function
+					glUniform4f(location,values[0],values[1],values[2],values[3]);
+				} else {
+					//array of float vec4
+					//call apropriate gl function
+					glUniform4fv(location,count,&values[0]);
+				}
+				break;
+			default:
+				//failed
+				return false;
+				break;
+		}
 	}
 	
 	//check for error
@@ -861,6 +933,46 @@ bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLs
 	}
 	
 	//sucess :D
+	return true;
+}
+
+bool ShaderProgramNative:: _GetUniformInt(int location,Array<int > values) {
+	// --- get a uniform as float ---
+	//check location
+	if (location == -1) {
+		return false;
+	}
+	
+	//do it
+	glGetUniformiv(program,location,&values[0]);
+	
+	//check for error
+	error = glGetError();
+	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+		return false;
+	}
+	
+	//success
+	return true;
+}
+
+bool ShaderProgramNative:: _GetUniformFloat(int location,Array<float > values) {
+	// --- get a uniform as float ---
+	//check location
+	if (location == -1) {
+		return false;
+	}
+	
+	//do it
+	glGetUniformfv(program,location,&values[0]);
+	
+	//check for error
+	error = glGetError();
+	if (error == GL_INVALID_VALUE || error == GL_INVALID_OPERATION) {
+		return false;
+	}
+	
+	//success
 	return true;
 }
 

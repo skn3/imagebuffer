@@ -1,5 +1,7 @@
 Strict
 
+'version 6
+' - can now set matrix uniform
 'version 5
 ' - shaders are now usable
 ' - examples updated to be contained in class applets
@@ -45,15 +47,17 @@ Extern
 		Method _Free:Bool()
 		Method _Attach:Bool(shader:ShaderNative)
 		Method _Detach:Bool(shader:ShaderNative)
+		Method _GetUniformLocation:Int(name:String)
+		Method _SetUniformInt:Bool(location:Int, values:Int[], count:Int, size:Int)
+		Method _SetUniformFloat:Bool(location:Int, values:Float[], count:Int, size:Int, columns:Int, rows:Int, transpose:bool = False)
+		Method _GetUniformInt:Bool(location:Int, values:Int[])
+		Method _GetUniformFloat:Bool(location:Int, values:Float[])
 		Public
 		Method HasError:Bool() = "_HasError"
 		Method GetError:String() = "_GetError"
 		Method Link:Bool() = "_Link"
 		Method Start:Bool() = "_Start"
 		Method Finish:Bool() = "_Finish"
-		Method GetUniformLocation:Int(name:String) = "_GetUniformLocation"
-		Method _SetUniformInt:Bool(location:Int, values:Int[], count:Int, size:Int)
-		Method _SetUniformFloat:Bool(location:Int, values:Float[], count:Int, size:Int)
 	End
 
 	Class FBONative
@@ -165,7 +169,7 @@ Const FRAGMENT_SHADER:= 2
 			Return True
 		End
 		
-		'uniform api
+		'set uniform api
 		Method SetUniform:Bool(location:Int, value:Int)
 			' --- set a uniform ---
 			'this sets a single int
@@ -264,7 +268,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[0] = value
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 1)
+			Return _SetUniformFloat(location, tempFloatVec, 1, 1, 0, 0, False)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Float, y:Float)
@@ -275,7 +279,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[1] = y
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 2)
+			Return _SetUniformFloat(location, tempFloatVec, 1, 2, 0, 0, False)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Float, y:Float, z:Float)
@@ -287,7 +291,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[2] = z
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 3)
+			Return _SetUniformFloat(location, tempFloatVec, 1, 3, 0, 0, False)
 		End
 		
 		Method SetUniform:Bool(location:Int, x:Float, y:Float, z:Float, w:Float)
@@ -300,7 +304,7 @@ Const FRAGMENT_SHADER:= 2
 			tempFloatVec[3] = w
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, tempFloatVec, 1, 4)
+			Return _SetUniformFloat(location, tempFloatVec, 1, 4, 0, 0, False)
 		End
 		
 		Method SetUniform:Bool(location:Int, values:Float[], count:Int)
@@ -319,7 +323,7 @@ Const FRAGMENT_SHADER:= 2
 			EndIf
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, values, count, 1)
+			Return _SetUniformFloat(location, values, count, 1, 0, 0, False)
 		End
 		
 		Method SetUniform:Bool(location:Int, values:Float[], size:Int, count:Int)
@@ -345,80 +349,117 @@ Const FRAGMENT_SHADER:= 2
 			EndIf
 			
 			'call the correct native method
-			Return _SetUniformFloat(location, values, count, size)
+			Return _SetUniformFloat(location, values, count, size, 0, 0, False)
 		End
 		
-		'uniform lazy api (provide location as a string)
-		Method SetUniform:Bool(location:String, value:Int)
+		Method SetUniform:Bool(location:Int, values:Float[], columns:Int, rows:Int, count:Int, transpose:Bool = False)
 			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), value)
+			'this sets an single/array of matrices
+			'check correct size is given
+			If columns < 2 or rows < 2 or columns > 4 or rows > 4
+				#IF CONFIG = "debug"
+					Print "SetUniform(matrix " + columns + "x" + rows + ") invalid matrix dimensions"
+				#End
+				Return False
+			EndIf
+			
+			'get count
+			If count < 1 count = Floor(values.Length / (columns * rows))
+			
+			'check tehre enough array elements
+			If count * (columns * rows) > values.Length
+				#IF CONFIG = "debug"
+					Print "SetUniform(matrix " + columns + "x" + rows + ") not enough elements in array"
+				#End
+				Return False
+			EndIf
+			
+			'call the correct native method
+			Return _SetUniformFloat(location, values, count, 0, columns, rows, transpose)
 		End
 		
-		Method SetUniform:Bool(location:String, x:Int, y:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), x, y)
+		'get uniform api
+		Method GetUniformLocation:Int(name:String)
+			' -- basic call to get uniform location ---
+			Return _GetUniformLocation(name)
 		End
 		
-		Method SetUniform:Bool(location:String, x:Int, y:Int, z:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), x, y, z)
+		Method GetUniformLocation:Int(name:String, index:Int)
+			' -- array call to get uniform location ---
+			Return _GetUniformLocation(name + "[" + index + "]")
 		End
 		
-		Method SetUniform:Bool(location:String, x:Int, y:Int, z:Int, w:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), x, y, z, w)
+		Method GetUniformLocation:Int(name:String, column:Int, row:Int, columns:Int, rows:Int)
+			' -- matrix call to get uniform location ---
+			Return _GetUniformLocation(name + "[" + ( (column * rows) + row + "]"))
 		End
 		
-		Method SetUniform:Bool(location:String, values:Int[], count:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), values, count)
+		Method GetUniform:Int(location:Int, defaultValue:Int)
+			' --- get a uniform ---
+			If _GetUniformInt(location, tempIntVec) = False
+				'there was an error so return the default value
+				Return defaultValue
+			EndIf
+			
+			'return the retrieved value
+			Return tempIntVec[0]
 		End
 		
-		Method SetUniform:Bool(location:String, values:Int[], size:Int, count:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), values, size, count)
+		Method GetUniform:Bool(location:Int, values:Int[], size:Int)
+			' --- get a uniform ---
+			'this gets a vec2, vec3 or vec4
+			'check correct size is given
+			If size < 2 or size > 4
+				#IF CONFIG = "debug"
+					Print "GetUniform(int vec" + size + ") invalid vec size"
+				#End
+				Return False
+			EndIf
+			
+			'check tehre enough array elements
+			If size > values.Length
+				#IF CONFIG = "debug"
+					Print "GetUniform(int vec" + size + ") not enough elements in array"
+				#End
+				Return False
+			EndIf
+			
+			'call the correct native method
+			Return _GetUniformInt(location, values)
 		End
 		
-		Method SetUniform:Bool(location:String, value:Float)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), value)
+		Method GetUniform:Float(location:Int, defaultValue:Float)
+			' --- get a uniform ---
+			If _GetUniformFloat(location, tempFloatVec) = False
+				'there was an error so return the default value
+				Return defaultValue
+			EndIf
+			
+			'return the retrieved value
+			Return tempFloatVec[0]
 		End
 		
-		Method SetUniform:Bool(location:String, x:Float, y:Float)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), x, y)
-		End
-		
-		Method SetUniform:Bool(location:String, x:Float, y:Float, z:Float)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), x, y, z)
-		End
-		
-		Method SetUniform:Bool(location:String, x:Float, y:Float, z:Float, w:Float)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), x, y, z, w)
-		End
-		
-		Method SetUniform:Bool(location:String, values:Float[], count:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), values, count)
-		End
-		
-		Method SetUniform:Bool(location:String, values:Float[], size:Int, count:Int)
-			' --- set a uniform ---
-			'this is for lazy people, it is better to store teh location yourself once before runtime!
-			Return SetUniform(GetUniformLocation(location), values, size, count)
+		Method GetUniform:Bool(location:Int, values:Float[], size:Int)
+			' --- get a uniform ---
+			'this gets a vec2, vec3 or vec4
+			'check correct size is given
+			If size < 2 or size > 4
+				#IF CONFIG = "debug"
+					Print "GetUniform(float vec" + size + ") invalid vec size"
+				#End
+				Return False
+			EndIf
+			
+			'check tehre enough array elements
+			If size > values.Length
+				#IF CONFIG = "debug"
+					Print "GetUniform(float vec" + size + ") not enough elements in array"
+				#End
+				Return False
+			EndIf
+			
+			'call the correct native method
+			Return _GetUniformFloat(location, values)
 		End
 	End
 		
@@ -430,10 +471,10 @@ Const FRAGMENT_SHADER:= 2
 			If _Init() = False Error("Error Creating FBO")
 		End
 		
-		Method Free:Void()
+		'Method Free:Void()
 			' --- destructor ---
-			_Free()
-		End
+		'	_Free()
+		'End
 		
 		Method SetImage:Void(image:Image)
 			' --- attach or dettach the image to the fbo ---
