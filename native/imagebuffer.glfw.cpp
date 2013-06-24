@@ -10,7 +10,8 @@ typedef char GLchar;
 
 void(__stdcall*glGenFramebuffers)(GLsizei n, GLuint* framebuffers);
 void(__stdcall*glBindFramebuffer)(GLenum target, GLuint framebuffer);
-void(__stdcall*glFramebufferTexture)(GLenum target, GLenum attachment, GLuint texture, GLint level);
+//void(__stdcall*glFramebufferTexture)(GLenum target, GLenum attachment, GLuint texture, GLint level);
+void(__stdcall*glFramebufferTexture2D)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
 GLenum(__stdcall*glCheckFramebufferStatus)(GLenum target);
 void(__stdcall*glDeleteFramebuffers)(GLsizei n, const GLuint* framebuffers);
 void(__stdcall*glGenRenderbuffers)(GLsizei n, GLuint* renderbuffers);
@@ -88,6 +89,8 @@ void(__stdcall*glGetProgramInfoLog)(GLuint program, GLsizei bufsize, GLsizei* le
 #define GRAPHICS_CAPABILITY_IMAGE_BUFFERS 1
 #define GRAPHICS_CAPABILITY_SHADERS 2
 
+static double glVersion = -1.0;
+
 static bool capabilitySupportedImageBuffers = false;
 static bool capabilitySupportedShaders = false;
 
@@ -99,9 +102,17 @@ static bool capabilityLoadedShaders = false;
 // --- functions ---
 static int CheckGraphicsCapability(int capability) {
 	// --- return if the device supports certain abilities ---
+	//get gl version if it hasnt been fetched
+	if (glVersion < 0.0) { glVersion = atof(reinterpret_cast<const char*>(glGetString(GL_VERSION))); }
+
+	//Print(glGetString(GL_EXTENSIONS));
 	switch(capability) {
 		case GRAPHICS_CAPABILITY_IMAGE_BUFFERS:
-			return glfwExtensionSupported("GL_ARB_framebuffer_object");
+			if (glVersion < 3.0) {
+				return glfwExtensionSupported("GL_EXT_framebuffer_object");
+			} else {
+				return glfwExtensionSupported("GL_ARB_framebuffer_object");
+			}
 			break;
 			
 		case GRAPHICS_CAPABILITY_SHADERS:
@@ -116,28 +127,43 @@ static int CheckGraphicsCapability(int capability) {
 static void LoadGraphicsCapability(int capability) {
 	// --- this will load a capability ---
 	//these will only ever be loaded once, obviously.
+	//get gl version if it hasnt been fetched
+	if (glVersion < 0.0) { glVersion = atof(reinterpret_cast<const char*>(glGetString(GL_VERSION))); }
 	
 	//do speciffic loading
 	switch(capability) {
 		case GRAPHICS_CAPABILITY_IMAGE_BUFFERS:
 			if (capabilityLoadedImageBuffers == false) {
 				capabilityLoadedImageBuffers = true;
-				
+
 				if (CheckGraphicsCapability(GRAPHICS_CAPABILITY_IMAGE_BUFFERS)) {
 					//supported
 					capabilitySupportedImageBuffers = true;
 					
 					//load extensions
-					(void*&)glGenFramebuffers=(void*)glfwGetProcAddress("glGenFramebuffers");
-					(void*&)glBindFramebuffer=(void*)glfwGetProcAddress("glBindFramebuffer");
-					(void*&)glFramebufferTexture=(void*)wglGetProcAddress("glFramebufferTexture");
-					(void*&)glCheckFramebufferStatus=(void*)wglGetProcAddress("glCheckFramebufferStatus");
-					(void*&)glDeleteFramebuffers=(void*)wglGetProcAddress("glDeleteFramebuffers");
-					(void*&)glGenRenderbuffers=(void*)wglGetProcAddress("glGenRenderbuffers");
-					(void*&)glRenderbufferStorage=(void*)wglGetProcAddress("glRenderbufferStorage");
-					(void*&)glFramebufferRenderbuffer=(void*)wglGetProcAddress("glFramebufferRenderbuffer");
-					(void*&)glBindRenderbuffer=(void*)wglGetProcAddress("glBindRenderbuffer");
-					(void*&)glDeleteRenderbuffers=(void*)wglGetProcAddress("glDeleteRenderbuffers");
+					if (glVersion < 3.0) {
+						(void*&)glGenFramebuffers=(void*)glfwGetProcAddress("glGenFramebuffersEXT");
+						(void*&)glBindFramebuffer=(void*)glfwGetProcAddress("glBindFramebufferEXT");
+						(void*&)glFramebufferTexture2D=(void*)wglGetProcAddress("glFramebufferTexture2DEXT");
+						(void*&)glCheckFramebufferStatus=(void*)wglGetProcAddress("glCheckFramebufferStatusEXT");
+						(void*&)glDeleteFramebuffers=(void*)wglGetProcAddress("glDeleteFramebuffersEXT");
+						(void*&)glGenRenderbuffers=(void*)wglGetProcAddress("glGenRenderbuffersEXT");
+						(void*&)glRenderbufferStorage=(void*)wglGetProcAddress("glRenderbufferStorageEXT");
+						(void*&)glFramebufferRenderbuffer=(void*)wglGetProcAddress("glFramebufferRenderbufferEXT");
+						(void*&)glBindRenderbuffer=(void*)wglGetProcAddress("glBindRenderbufferEXT");
+						(void*&)glDeleteRenderbuffers=(void*)wglGetProcAddress("glDeleteRenderbuffersEXT");
+					} else {
+						(void*&)glGenFramebuffers=(void*)glfwGetProcAddress("glGenFramebuffers");
+						(void*&)glBindFramebuffer=(void*)glfwGetProcAddress("glBindFramebuffer");
+						(void*&)glFramebufferTexture2D=(void*)wglGetProcAddress("glFramebufferTexture2D");
+						(void*&)glCheckFramebufferStatus=(void*)wglGetProcAddress("glCheckFramebufferStatus");
+						(void*&)glDeleteFramebuffers=(void*)wglGetProcAddress("glDeleteFramebuffers");
+						(void*&)glGenRenderbuffers=(void*)wglGetProcAddress("glGenRenderbuffers");
+						(void*&)glRenderbufferStorage=(void*)wglGetProcAddress("glRenderbufferStorage");
+						(void*&)glFramebufferRenderbuffer=(void*)wglGetProcAddress("glFramebufferRenderbuffer");
+						(void*&)glBindRenderbuffer=(void*)wglGetProcAddress("glBindRenderbuffer");
+						(void*&)glDeleteRenderbuffers=(void*)wglGetProcAddress("glDeleteRenderbuffers");
+					}
 		
 				} else {
 					//not supported
@@ -872,6 +898,7 @@ bool ShaderProgramNative::_SetUniformFloat(int location,Array<Float > values,GLs
 				break;
 		}
 	} else {
+		//setting single data types or arrays of
 		//check size
 		switch(size) {
 			case 1:
@@ -1061,8 +1088,8 @@ bool FBONative::_Detach() {
 		height = 0;
 		
 		//dettach texture and depth buffer
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,0, 0);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
 		
 		//destroy the depth buffer
 		glDeleteRenderbuffers(1,&depthBuffer);
@@ -1080,7 +1107,6 @@ bool FBONative::_Start() {
 	// --- bind the fbo ---
 	if (startLocked == false && capabilitySupportedImageBuffers && attached && bound == false) {
 		bound = true;
-		
 		//check if mojo is current rendering
 		if (bb_graphics_renderDevice == 0) {
 			//we are rendering to the fbo outside of OnRender()
@@ -1096,7 +1122,7 @@ bool FBONative::_Start() {
 			//make monkey flush itself
 			bb_graphics_renderDevice->Flush();
 		}
-		
+
 		//bind the fbo
 		glBindFramebuffer(GL_FRAMEBUFFER,fbo);
 		
@@ -1104,8 +1130,8 @@ bool FBONative::_Start() {
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER, depthBuffer);
 		
 		//attach texture
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,texture, 0);
-				
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,texture, 0);
+
 		//check for success
 		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 			_Finish();
@@ -1134,7 +1160,7 @@ bool FBONative::_Start() {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
 		glDisable(GL_TEXTURE_2D);
-		bb_graphics_renderDevice->primCount=0;
+		bb_graphics_renderDevice->vertCount=0;
 		
 		//rember device size so we can restore it later
 		deviceWidth = bb_graphics_device->width;
@@ -1199,7 +1225,7 @@ bool FBONative::_Finish() {
 bool FBONative::_Clear(float r,float g, float b,float a = 255.0) {
 	// --- this is a helper for completely clearing the image (alpha and all) ---
 	if (bound == true) {
-		bb_graphics_renderDevice->primCount=0;
+		bb_graphics_renderDevice->vertCount=0;
 
 		glClearColor( r/255.0f,g/255.0f,b/255.0f,a/255.0f );
 		glClear( GL_COLOR_BUFFER_BIT );

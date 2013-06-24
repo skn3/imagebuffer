@@ -1,5 +1,8 @@
 Strict
 
+'version 7
+' - updated to work with Monkey 71b+
+' - fbos now working on opengl 2.0 :D
 'version 6
 ' - can now set matrix uniform
 'version 5
@@ -355,6 +358,8 @@ Const FRAGMENT_SHADER:= 2
 		Method SetUniform:Bool(location:Int, values:Float[], columns:Int, rows:Int, count:Int, transpose:Bool = False)
 			' --- set a uniform ---
 			'this sets an single/array of matrices
+			'transpose dictates if the data is provided in column major or row major format (false = column major)
+			
 			'check correct size is given
 			If columns < 2 or rows < 2 or columns > 4 or rows > 4
 				#IF CONFIG = "debug"
